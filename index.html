@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>咒语魔盒 (Prompt Fill Tool) V0.8.0</title>
+<title>咒语魔盒 (Prompt Fill Tool) V0.8.1</title>
 <style>
     /* --- 核心主题变量 --- */
     :root {
@@ -14,59 +14,96 @@
         --bg-white: #ffffff;
         --border: #e5e7eb;
         --radius: 16px;
+        --safe-top: env(safe-area-inset-top);
         --safe-bottom: env(safe-area-inset-bottom);
         
-        /* 变量分组色系 (参考截图) */
-        --c-char-bg: #dbeafe; --c-char-text: #1e40af; /* 人物-蓝 */
-        --c-act-bg: #fce7f3; --c-act-text: #db2777;  /* 动作-粉 */
-        --c-vis-bg: #f3e8ff; --c-vis-text: #7e22ce;  /* 画面-紫 */
-        --c-item-bg: #ffedd5; --c-item-text: #c2410c; /* 物品-橙 */
-        --c-loc-bg: #d1fae5; --c-loc-text: #047857;  /* 地点-绿 */
-        --c-other-bg: #f3f4f6; --c-other-text: #4b5563; /* 其他-灰 */
+        /* 变量分组色系 */
+        --c-char-bg: #dbeafe; --c-char-text: #1e40af;
+        --c-act-bg: #fce7f3; --c-act-text: #db2777;
+        --c-vis-bg: #f3e8ff; --c-vis-text: #7e22ce;
+        --c-item-bg: #ffedd5; --c-item-text: #c2410c;
+        --c-loc-bg: #d1fae5; --c-loc-text: #047857;
+        --c-other-bg: #f3f4f6; --c-other-text: #4b5563;
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; background: var(--bg-body); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* 核心布局修复: 使用 dvh 解决移动端地址栏问题 */
+    body { 
+        margin: 0; 
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; 
+        background: var(--bg-body); 
+        color: var(--text-main); 
+        height: 100vh; 
+        height: 100dvh; /* 关键修复 */
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+    }
 
-    /* --- 布局框架 --- */
+    /* --- 布局容器 --- */
     .app-viewport { flex: 1; overflow: hidden; position: relative; width: 100%; height: 100%; }
-    .tab-view { position: absolute; inset: 0; display: none; flex-direction: column; background: var(--bg-body); padding-bottom: calc(60px + var(--safe-bottom)); }
+    
+    .tab-view { 
+        position: absolute; inset: 0; display: none; flex-direction: column; 
+        background: var(--bg-body); 
+        /* 底部留出导航栏空间 */
+        padding-bottom: calc(56px + var(--safe-bottom)); 
+    }
     .tab-view.active { display: flex; animation: fadeIn 0.2s ease-out; }
-    .scroll-content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 16px; }
+    
+    .scroll-content { 
+        flex: 1; 
+        overflow-y: auto; 
+        overflow-x: hidden; 
+        -webkit-overflow-scrolling: touch; 
+        padding: 16px; 
+        padding-bottom: 80px; /* 底部留白，防止被浮动按钮遮挡 */
+    }
 
     /* --- 通用组件 --- */
-    .header-bar { padding: 12px 16px; background: var(--bg-white); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px rgba(0,0,0,0.05); z-index: 10; height: 56px; }
+    /* 标题栏修复: 增加顶部安全距离 */
+    .header-bar { 
+        padding: 12px 16px; 
+        padding-top: calc(12px + var(--safe-top)); /* 关键修复: 避开刘海 */
+        background: var(--bg-white); 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+        z-index: 20; 
+        min-height: calc(56px + var(--safe-top)); /* 确保高度足够 */
+    }
     .page-title { font-size: 18px; font-weight: 800; color: var(--text-main); }
     
     .btn-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--text-sub); transition: 0.1s; background: transparent; border: none; }
     .btn-icon:active { background: #f3f4f6; color: var(--text-main); transform: scale(0.95); }
     .btn-icon.primary { background: #eef2ff; color: var(--primary); }
 
-    /* --- Editor 交互式预览 (核心交互优化) --- */
-    .editor-card { background: var(--bg-white); border-radius: var(--radius); box-shadow: 0 4px 20px rgba(0,0,0,0.05); overflow: hidden; min-height: 80%; display: flex; flex-direction: column; }
+    /* --- Editor 交互式预览 --- */
+    .editor-card { background: var(--bg-white); border-radius: var(--radius); box-shadow: 0 4px 20px rgba(0,0,0,0.05); overflow: hidden; min-height: 200px; display: flex; flex-direction: column; margin-bottom: 20px; }
     
-    /* 图片占位区 (IMG_2947) */
-    .card-visual { height: 160px; background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%); display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 12px; font-weight: 600; letter-spacing: 1px; border-bottom: 1px solid #f3f4f6; }
+    .card-visual { height: 140px; background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%); display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 12px; font-weight: 600; letter-spacing: 1px; border-bottom: 1px solid #f3f4f6; }
     
     .card-content { padding: 24px 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.8; color: #374151; white-space: pre-wrap; flex: 1; }
     
-    /* 交互式胶囊 (Chips) */
+    /* 交互式胶囊 */
     .interactive-chip { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 13px; font-weight: 600; margin: 2px 2px; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.05); user-select: none; }
     .interactive-chip:active { transform: scale(0.95); opacity: 0.8; }
     .interactive-chip.empty { border-style: dashed; background: #fff; color: #9ca3af; border-color: #d1d5db; padding: 2px 8px; }
 
     /* 分组颜色 */
-    .chip-char { background: var(--c-char-bg); color: var(--c-char-text); border-color: rgba(59, 130, 246, 0.2); }
-    .chip-act { background: var(--c-act-bg); color: var(--c-act-text); border-color: rgba(236, 72, 153, 0.2); }
-    .chip-vis { background: var(--c-vis-bg); color: var(--c-vis-text); border-color: rgba(139, 92, 246, 0.2); }
-    .chip-item { background: var(--c-item-bg); color: var(--c-item-text); border-color: rgba(245, 158, 11, 0.2); }
-    .chip-loc { background: var(--c-loc-bg); color: var(--c-loc-text); border-color: rgba(16, 185, 129, 0.2); }
+    .chip-char { background: var(--c-char-bg); color: var(--c-char-text); }
+    .chip-act { background: var(--c-act-bg); color: var(--c-act-text); }
+    .chip-vis { background: var(--c-vis-bg); color: var(--c-vis-text); }
+    .chip-item { background: var(--c-item-bg); color: var(--c-item-text); }
+    .chip-loc { background: var(--c-loc-bg); color: var(--c-loc-text); }
     
-    /* --- 底部选词面板 (IMG_2948) --- */
+    /* --- 底部选词面板 --- */
     .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; display: flex; flex-direction: column; justify-content: flex-end; backdrop-filter: blur(4px); }
     .sheet-overlay.open { opacity: 1; pointer-events: auto; }
     
-    .sheet-container { background: var(--bg-white); width: 100%; max-height: 75vh; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 -10px 40px rgba(0,0,0,0.1); }
+    .sheet-container { background: var(--bg-white); width: 100%; max-height: 70vh; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 -10px 40px rgba(0,0,0,0.1); }
     .sheet-overlay.open .sheet-container { transform: translateY(0); }
     
     .sheet-header { padding: 16px 20px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; background: #fff; }
@@ -83,7 +120,6 @@
     
     .sheet-footer { padding: 12px 20px calc(12px + var(--safe-bottom)); border-top: 1px solid #f3f4f6; background: #fff; }
     .btn-add-custom { width: 100%; padding: 12px; border: 1px dashed #d1d5db; border-radius: 10px; color: var(--text-sub); font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; background: transparent; }
-    .btn-add-custom:active { background: #f9fafb; border-color: var(--text-sub); color: var(--text-main); }
 
     /* --- 模版列表 --- */
     .tpl-item { background: #fff; padding: 16px; margin-bottom: 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid transparent; transition: 0.1s; }
@@ -99,7 +135,6 @@
     .conf-title { padding: 0 8px 8px; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px; }
     .conf-list { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
     .conf-row { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-    .conf-row:last-child { border-bottom: none; }
     .conf-key { font-family: monospace; font-size: 11px; color: #9ca3af; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
 
     /* --- 底部导航 --- */
@@ -112,6 +147,9 @@
     /* 浮动按钮 */
     .fab { position: fixed; bottom: calc(70px + var(--safe-bottom)); right: 20px; width: 50px; height: 50px; border-radius: 25px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(79,70,229,0.3); z-index: 40; transition: transform 0.2s; }
     .fab:active { transform: scale(0.9); }
+    
+    /* 第二个浮动按钮 (Copy) */
+    .fab-copy { bottom: calc(130px + var(--safe-bottom)); background: #1f2937; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
     /* 动画 */
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -127,7 +165,7 @@
     <div id="tab-templates" class="tab-view active">
         <div class="header-bar">
             <div class="page-title">模版管理</div>
-            <div style="font-size:12px;color:#999;">V0.8.0</div>
+            <div style="font-size:12px;color:#999;">V0.8.1</div>
         </div>
         <div id="tpl-list" class="scroll-content">
             <!-- JS 生成 -->
@@ -139,8 +177,8 @@
 
     <!-- TAB 2: Editor (交互式填空) -->
     <div id="tab-editor" class="tab-view">
-        <div class="header-bar" style="border-bottom:1px solid #f3f4f6;">
-            <div class="page-title" id="editor-title" style="font-size:16px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">未选择模版</div>
+        <div class="header-bar">
+            <div class="page-title" id="editor-title" style="font-size:16px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">未选择模版</div>
             <div style="display:flex;gap:4px;">
                 <button class="btn-icon" onclick="switchMode()" title="切换源码模式">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
@@ -170,6 +208,11 @@
                 <input id="code-title" placeholder="模版标题" style="padding:12px;border:1px solid #ddd;border-radius:10px;">
                 <textarea id="code-content" style="flex:1;padding:12px;border:1px solid #ddd;border-radius:10px;resize:none;font-family:monospace;line-height:1.5;" placeholder="输入 Prompt..."></textarea>
             </div>
+        </div>
+        
+        <!-- 双重保险：页面底部悬浮复制按钮 -->
+        <div class="fab fab-copy" onclick="copyResult()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </div>
     </div>
 
@@ -223,7 +266,7 @@
 </div>
 
 <script>
-// --- 1. 数据配置 (全量同步) ---
+// --- 1. 数据配置 ---
 const VAR_MAP = {
     role: "角色身份", subject: "主体对象", character_companion: "合影角色", expressions: "表情集",
     grid_pose: "九宫格动作", action_detail: "动作细节", action_pose: "互动姿势",
@@ -421,7 +464,6 @@ window.switchTab = (t) => { state.tab = t; save(); }
 window.selectTemplate = (id) => { 
     state.activeId = id; 
     state.tab = 'editor'; 
-    // 震动反馈 (如果设备支持)
     if(navigator.vibrate) navigator.vibrate(10);
     save(); 
 }
@@ -489,12 +531,10 @@ window.createNewTemplate = () => {
 // 源码编辑监听
 document.getElementById('code-title').addEventListener('input', e => {
     getActiveTpl().title = e.target.value;
-    // 不立即 save 避免频繁重绘，可以用 debounce，这里简化
 });
 document.getElementById('code-content').addEventListener('input', e => {
     getActiveTpl().content = e.target.value;
 });
-// 失去焦点时保存
 document.getElementById('code-content').addEventListener('blur', save);
 document.getElementById('code-title').addEventListener('blur', save);
 

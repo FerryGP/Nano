@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>提示词填空器 (Prompt Fill Tool) V0.4.1</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5', // Indigo-600 (Primary Brand)
+                            700: '#4338ca',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'glow': '0 0 15px rgba(99, 102, 241, 0.3)'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- HTML2Canvas (用于生成长图) -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .glass-effect { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        
+        /* 变量高亮动画 */
+        .var-highlight { transition: all 0.3s ease; }
+        .var-filled { background-color: #e0e7ff; color: #4338ca; border-bottom: 2px solid #6366f1; }
+        .var-empty { background-color: #fef3c7; color: #d97706; border-bottom: 2px dashed #f59e0b; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-[100dvh] w-full overflow-hidden flex flex-col">
+    <div id="root" class="h-full w-full flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- Icons (Lucide) ---
+        const Icon = ({ path, size = 20, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
+        );
+        const Icons = {
+            Layout: (p) => <Icon {...p} path={<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></>} />,
+            Edit3: (p) => <Icon {...p} path={<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>} />,
+            Database: (p) => <Icon {...p} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>} />,
+            Settings: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>} />,
+            Plus: (p) => <Icon {...p} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />,
+            Trash2: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />,
+            Copy: (p) => <Icon {...p} path={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>} />,
+            Check: (p) => <Icon {...p} path={<polyline points="20 6 9 17 4 12"/>} />,
+            Download: (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>} />,
+            ChevronDown: (p) => <Icon {...p} path={<polyline points="6 9 12 15 18 9"/>} />,
+            RefreshCw: (p) => <Icon {...p} path={<><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>} />,
+            Code: (p) => <Icon {...p} path={<><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></>} />,
+            Eye: (p) => <Icon {...p} path={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>} />,
+            // Group Icons
+            User: (p) => <Icon {...p} path={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>} />,
+            Activity: (p) => <Icon {...p} path={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>} />,
+            Image: (p) => <Icon {...p} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />,
+            Package: (p) => <Icon {...p} path={<><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>} />,
+            MapPin: (p) => <Icon {...p} path={<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>} />
+        };
+
+        // --- Data Configuration ---
+        const VARIABLE_GROUPS = {
+            character: { label: "人物 (CHARACTER)", keys: ["role", "subject", "character_companion", "expressions"], icon: "User", color: "border-blue-500" },
+            action: { label: "动作 (ACTION)", keys: ["grid_pose", "action_detail", "action_pose"], icon: "Activity", color: "border-green-500" },
+            visuals: { label: "画面 (VISUALS)", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"], icon: "Image", color: "border-purple-500" },
+            item: { label: "物品 (ITEM)", keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"], icon: "Package", color: "border-orange-500" },
+            location: { label: "地点 (LOCATION)", keys: ["background_scene"], icon: "MapPin", color: "border-red-500" }
+        };
+
+        const DEFAULT_TEMPLATES = [
+            {
+                id: 't1',
+                title: '角色概念分解图',
+                content: `Role (角色设定)
+你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图（Character Sheet）。你具备“像素级拆解”的能力，能够透视角色的穿着层级、捕捉微表情变化，并将与其相关的物品进行具象化还原。你特别擅长通过 {{subject}} 的私密物品、随身物件和生活细节来侧面丰满人物性格与背景故事。
+
+Task (任务目标)
+根据用户上传或描述的主体形象，生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情、核心道具、材质特写，以及极具生活气息的私密与随身物品展示。
+
+Visual Guidelines (视觉规范)
+1. 构图布局(Layout):
+•中心位(Center): 放置角色的 {{layout_focus}} ，作为视觉锚点。
+•环绕位(Surroundings): 在中心人物四周空白处，有序排列拆解后的元素。
+•视觉引导(Connectors): 使用 {{connectors}} ，将周边的拆解物品与中心人物的对应部位或所属区域连接起来。
+
+2. 拆解内容(Deconstruction Details):
+•服装分层(Clothing Layers): 将角色的服装拆分为单品展示，例如： {{clothing}}
+•私密内着拆解: 独立展示角色的内层衣物，重点突出设计感与材质。例如： {{underwear_style}} （展示细节与剪裁）。
+•表情集(Expression Sheet): 在角落绘制3-4 个不同的头部特写，展示不同的情绪，如： {{expressions}} 。
+•材质特写(Texture & Zoom): 选取关键部位进行放大特写。例如： {{texture_zoom}} ，增加对小物件材质的描绘。
+•动作: 绘制特殊的动作和表情，例如： {{action_detail}} ，增加动作的深度刻画。
+•特殊视角: 绘制从某种特殊场景下拍摄的特殊视角，例如： {{special_view}}
+•关联物品(Related Items):
+•随身包袋与内容物: 绘制 {{bag_content}} ，并将其“打开”，展示散落在旁的物品。
+•美妆与护理: 展示 {{cosmetics}} 。
+•私密生活物件: 具象化角色隐藏面的物品。根据角色性格可能包括： {{private_items}} ，需以一种设计图的客观视角呈现。
+
+3. 风格与注释(Style & Annotations):
+•画风: {{art_style}} ，线条干净利落。
+•背景: {{background_style}} ，营造设计手稿的氛围。
+•灯光: {{lighting}}`
+            },
+            {
+                id: 't2',
+                title: '3x3 摄影网格',
+                content: `创建一个 3x3 的摄影网格，展示 {{subject}} 的不同角度。
+风格: {{art_style}}
+光线: {{lighting}}
+每个格子应该展示: {{action_pose}}
+构图参考: {{camera_angle}}`
+            },
+            {
+                id: 't3',
+                title: '时尚情绪板插画',
+                content: `创建一个关于 {{clothing}} 的时尚情绪板。
+配色方案: {{background_style}}
+模特姿势: {{grid_pose}}
+细节重点: {{fashion_deconstruct}}`
+            }
+        ];
+
+        const DEFAULT_OPTIONS = {
+            role: ["游戏概念设计师", "时尚摄影师", "电影导演", "人设画师"],
+            subject: ["赛博朋克黑客", "森林精灵", "都市白领", "机甲战士", "废土流浪者"],
+            art_style: ["2D 插画", "吉卜力风格", "写实摄影", "油画", "像素艺术"],
+            layout_focus: ["全身立绘", "半身像", "头部特写", "背影"],
+            lighting: ["自然光", "赛博霓虹", "伦勃朗光", "边缘光"],
+            expressions: ["冷漠", "狂喜", "羞涩", "病娇"],
+            clothing: ["机能风外套", "丝绸长裙", "战术背心", "JK制服"],
+            background_style: ["纯色背景", "赛博街道", "魔法森林", "废弃工厂"]
+        };
+
+        // --- App Component ---
+        function App() {
+            // Data State
+            const [templates, setTemplates] = useState(() => JSON.parse(localStorage.getItem('pf_v4_templates')) || DEFAULT_TEMPLATES);
+            const [options, setOptions] = useState(() => JSON.parse(localStorage.getItem('pf_v4_options')) || DEFAULT_OPTIONS);
+            const [activeTemplateId, setActiveTemplateId] = useState(() => localStorage.getItem('pf_v4_active_id') || 't1');
+            const [fillValues, setFillValues] = useState(() => JSON.parse(localStorage.getItem('pf_v4_values')) || {});
+            
+            // UI State
+            const [activeTab, setActiveTab] = useState('fill'); // 'templates' | 'fill' | 'config'
+            const [editorMode, setEditorMode] = useState('fill'); // 'fill' (inputs) | 'code' (raw text)
+
+            // Persistence
+            useEffect(() => {
+                localStorage.setItem('pf_v4_templates', JSON.stringify(templates));
+                localStorage.setItem('pf_v4_options', JSON.stringify(options));
+                localStorage.setItem('pf_v4_active_id', activeTemplateId);
+                localStorage.setItem('pf_v4_values', JSON.stringify(fillValues));
+            }, [templates, options, activeTemplateId, fillValues]);
+
+            const activeTemplate = useMemo(() => templates.find(t => t.id === activeTemplateId) || templates[0], [templates, activeTemplateId]);
+
+            // Handlers
+            const updateTemplate = (id, newContent) => {
+                setTemplates(prev => prev.map(t => t.id === id ? { ...t, content: newContent } : t));
+            };
+
+            const addTemplate = () => {
+                const newId = 't' + Date.now();
+                setTemplates([...templates, { id: newId, title: '新模版', content: '输入内容，使用 {{variable}} 定义变量...' }]);
+                setActiveTemplateId(newId);
+                if(window.innerWidth < 1024) setActiveTab('fill'); // Mobile: Jump to fill
+            };
+
+            const deleteTemplate = (e, id) => {
+                e.stopPropagation();
+                if (templates.length <= 1) return;
+                if (!confirm('删除此模版？')) return;
+                const next = templates.filter(t => t.id !== id);
+                setTemplates(next);
+                if (activeTemplateId === id) setActiveTemplateId(next[0].id);
+            };
+
+            // Layout Render
+            return (
+                <div className="flex flex-col h-full bg-gray-50 text-gray-800">
+                    
+                    {/* Desktop Layout: Split View */}
+                    <div className="flex-1 flex overflow-hidden">
+                        
+                        {/* 1. Sidebar (Desktop) / Tab View (Mobile) */}
+                        <div className={`
+                            ${activeTab === 'templates' ? 'translate-x-0 z-20' : '-translate-x-full lg:translate-x-0'}
+                            fixed inset-0 lg:static lg:inset-auto bg-gray-50 lg:w-72 lg:border-r border-gray-200 transition-transform duration-300 flex flex-col
+                        `}>
+                            <div className="p-5 border-b border-gray-200 bg-white shrink-0 flex justify-between items-center">
+                                <div>
+                                    <h1 className="font-bold text-lg text-primary-600 tracking-tight">提示词填空器</h1>
+                                    <span className="text-[10px] bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded font-mono font-medium">V0.4.1</span>
+                                </div>
+                                <button className="lg:hidden p-2 text-gray-400" onClick={() => setActiveTab('fill')}>
+                                    <Icons.ChevronDown size={20} className="rotate-90"/>
+                                </button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                                {templates.map(t => (
+                                    <div 
+                                        key={t.id}
+                                        onClick={() => { setActiveTemplateId(t.id); if(window.innerWidth < 1024) setActiveTab('fill'); }}
+                                        className={`
+                                            group p-3 rounded-xl border cursor-pointer transition-all hover:shadow-sm
+                                            ${t.id === activeTemplateId 
+                                                ? 'bg-white border-primary-200 shadow-soft ring-1 ring-primary-50' 
+                                                : 'bg-transparent border-transparent hover:bg-white hover:border-gray-200'}
+                                        `}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-1 h-8 rounded-full transition-colors ${t.id === activeTemplateId ? 'bg-primary-500' : 'bg-gray-200 group-hover:bg-gray-300'}`}></div>
+                                            <div className="flex-1 min-w-0">
+                                                <input 
+                                                    value={t.title}
+                                                    onChange={(e) => {
+                                                        const newTitle = e.target.value;
+                                                        setTemplates(prev => prev.map(pt => pt.id === t.id ? {...pt, title: newTitle} : pt));
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className={`w-full bg-transparent text-sm font-medium focus:outline-none ${t.id === activeTemplateId ? 'text-gray-900' : 'text-gray-500'}`}
+                                                />
+                                            </div>
+                                            {t.id === activeTemplateId && (
+                                                <button onClick={(e) => deleteTemplate(e, t.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
+                                                    <Icons.Trash2 size={14}/>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div className="p-4 border-t border-gray-200 bg-white">
+                                <button onClick={addTemplate} className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 text-sm font-medium transition-all active:scale-95">
+                                    <Icons.Plus size={18}/> 新建模版
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 2. Main Workspace (Config is Modal on Mobile, Column on Desktop?) -> Let's keep Config as a separate full view on Mobile, but Desktop? 
+                           Let's simplify: Config is Tab 3 on mobile. On Desktop, maybe a drawer or modal. 
+                           For this "Pixel Perfect" request, let's treat Config as a tab on Mobile, and a button triggering a modal on Desktop to keep layout clean.
+                        */}
+                        <div className={`
+                            flex-1 flex flex-col bg-white relative overflow-hidden
+                            ${activeTab === 'config' ? 'hidden lg:flex' : 'flex'}
+                        `}>
+                            <Workspace 
+                                template={activeTemplate} 
+                                updateTemplate={updateTemplate}
+                                options={options}
+                                values={fillValues}
+                                setValues={setFillValues}
+                                editorMode={editorMode}
+                                setEditorMode={setEditorMode}
+                            />
+                        </div>
+
+                        {/* 3. Config View (Mobile Specific Fullscreen, Desktop Modal/Drawer if needed) */}
+                         <div className={`
+                            ${activeTab === 'config' ? 'translate-x-0 z-20' : '-translate-x-full lg:hidden'}
+                            fixed inset-0 bg-gray-50 transition-transform duration-300 flex flex-col lg:hidden
+                        `}>
+                            <div className="p-4 bg-white border-b flex justify-between items-center">
+                                <h2 className="font-bold text-lg">词库配置</h2>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4">
+                                <ConfigPanel options={options} setOptions={setOptions} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Mobile Bottom Nav */}
+                    <div className="lg:hidden bg-white/90 backdrop-blur border-t border-gray-200 flex justify-around items-center h-16 pb-safe shrink-0 z-50">
+                        <NavBtn icon={Icons.Layout} label="模版" active={activeTab === 'templates'} onClick={() => setActiveTab('templates')} />
+                        <NavBtn icon={Icons.Edit3} label="填空" active={activeTab === 'fill'} onClick={() => setActiveTab('fill')} />
+                        <NavBtn icon={Icons.Database} label="词库" active={activeTab === 'config'} onClick={() => setActiveTab('config')} />
+                    </div>
+                    
+                    {/* Desktop Config Modal (Hidden by default, could be added later or integrated) */}
+                    {/* For now, we put a Config button in the Workspace toolbar for Desktop */}
+
+                </div>
+            );
+        }
+
+        // --- Workspace Component ---
+        function Workspace({ template, updateTemplate, options, values, setValues, editorMode, setEditorMode }) {
+            const [showConfigDesktop, setShowConfigDesktop] = useState(false);
+            const previewRef = useRef(null);
+
+            // Parse Variables
+            const variables = useMemo(() => {
+                const regex = /\{\{([^}]+)\}\}/g;
+                const found = new Set();
+                let match;
+                while ((match = regex.exec(template.content)) !== null) {
+                    found.add(match[1].trim());
+                }
+                return Array.from(found);
+            }, [template.content]);
+
+            // Grouping Logic
+            const groupedVars = useMemo(() => {
+                const groups = { other: [] };
+                Object.keys(VARIABLE_GROUPS).forEach(k => groups[k] = []);
+                variables.forEach(v => {
+                    let matched = false;
+                    for (const [gKey, gCfg] of Object.entries(VARIABLE_GROUPS)) {
+                        if (gCfg.keys.includes(v)) {
+                            groups[gKey].push(v);
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (!matched) groups.other.push(v);
+                });
+                return groups;
+            }, [variables]);
+
+            const generatedText = useMemo(() => {
+                let txt = template.content;
+                variables.forEach(v => {
+                    const val = values[v] || `{{${v}}}`;
+                    txt = txt.split(`{{${v}}}`).join(val);
+                });
+                return txt;
+            }, [template.content, values, variables]);
+
+            const handleCopy = () => {
+                navigator.clipboard.writeText(generatedText);
+                alert('已复制到剪贴板');
+            };
+
+            const handleSaveImage = async () => {
+                if (!previewRef.current) return;
+                try {
+                    const canvas = await html2canvas(previewRef.current, {
+                        backgroundColor: '#ffffff',
+                        scale: 2,
+                        logging: false
+                    });
+                    const link = document.createElement('a');
+                    link.download = `Prompt_${template.title}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                } catch (err) {
+                    console.error("Image generation failed", err);
+                    alert("生成图片失败，请重试");
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-full relative">
+                    {/* Toolbar */}
+                    <div className="h-16 px-6 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <button 
+                                onClick={() => setEditorMode('fill')}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 ${editorMode === 'fill' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}
+                            >
+                                <Icons.Edit3 size={14}/> 交互填空
+                            </button>
+                            <button 
+                                onClick={() => setEditorMode('code')}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 ${editorMode === 'code' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'}`}
+                            >
+                                <Icons.Code size={14}/> 编辑源码
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                             {/* Desktop Config Toggle */}
+                             <button onClick={() => setShowConfigDesktop(!showConfigDesktop)} className="hidden lg:flex p-2 text-gray-400 hover:bg-gray-100 rounded-lg">
+                                <Icons.Database size={18}/>
+                            </button>
+                            <div className="w-px h-6 bg-gray-200 mx-1 hidden lg:block"></div>
+                            <button onClick={handleSaveImage} className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-gray-600 hover:bg-gray-50 rounded-lg text-xs font-bold transition-colors">
+                                <Icons.Download size={16}/> 保存长图
+                            </button>
+                            <button onClick={handleCopy} className="flex items-center gap-1.5 px-4 py-2 bg-black text-white rounded-lg text-xs font-bold hover:bg-gray-800 transition-colors shadow-lg shadow-gray-200 active:scale-95">
+                                <Icons.Copy size={16}/> 复制结果
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Content Area */}
+                    <div className="flex-1 flex overflow-hidden relative">
+                        
+                        {editorMode === 'code' ? (
+                            <textarea 
+                                className="w-full h-full p-8 font-mono text-sm leading-relaxed text-gray-800 resize-none focus:outline-none bg-gray-50"
+                                value={template.content}
+                                onChange={(e) => updateTemplate(template.id, e.target.value)}
+                            />
+                        ) : (
+                            <div className="w-full h-full flex flex-col lg:flex-row">
+                                
+                                {/* Left: Input Scroll Area */}
+                                <div className="flex-1 lg:max-w-[450px] overflow-y-auto p-4 lg:p-6 custom-scrollbar bg-gray-50/50 border-r border-gray-100 pb-24">
+                                    
+                                    {/* Mobile Preview Block (Restored) */}
+                                    <div className="lg:hidden mb-6 bg-white/50 border border-indigo-100 p-4 rounded-xl shadow-sm">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">实时预览</h3>
+                                            <button onClick={handleCopy} className="text-[10px] bg-white border border-gray-200 px-2 py-1 rounded text-gray-600">复制</button>
+                                        </div>
+                                        <div className="prose prose-sm max-w-none font-mono whitespace-pre-wrap leading-relaxed text-gray-700 text-xs break-all">
+                                            <HighlightText text={generatedText} values={values} variables={variables} />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        {Object.entries(groupedVars).map(([key, vars]) => {
+                                            if (vars.length === 0) return null;
+                                            const gInfo = VARIABLE_GROUPS[key] || { label: "其他变量", icon: "Settings", color: "border-gray-400" };
+                                            const GIcon = Icons[gInfo.icon];
+                                            
+                                            return (
+                                                <div key={key} className="space-y-3 animate-enter">
+                                                    <h3 className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">
+                                                        <GIcon size={12}/> {gInfo.label}
+                                                    </h3>
+                                                    <div className="space-y-3">
+                                                        {vars.map(v => (
+                                                            <InputCard 
+                                                                key={v}
+                                                                label={v}
+                                                                value={values[v] || ''}
+                                                                onChange={(val) => setValues(prev => ({...prev, [v]: val}))}
+                                                                options={options[v] || []}
+                                                                accentColor={gInfo.color}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        {variables.length === 0 && (
+                                            <div className="text-center py-20 text-gray-400 text-sm">
+                                                当前模版没有变量。请切换到“编辑源码”模式添加 {{'{{变量}}'}}。
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right: Preview Area */}
+                                <div className="hidden lg:block flex-1 bg-gray-100 overflow-y-auto p-8 custom-scrollbar relative">
+                                    <div ref={previewRef} className="max-w-3xl mx-auto bg-white min-h-[600px] shadow-sm rounded-xl p-12 border border-gray-200">
+                                        <div className="prose prose-sm max-w-none font-mono whitespace-pre-wrap leading-loose text-gray-700">
+                                            <HighlightText text={generatedText} values={values} variables={variables} />
+                                        </div>
+                                        <div className="mt-12 pt-6 border-t border-gray-100 flex justify-between items-center opacity-50">
+                                            <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Prompt Fill Tool</span>
+                                            <span className="text-xs text-gray-400">Generated by AI</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Mobile Preview (Sticky Bottom Sheet-like area? Or just below inputs? Let's use a preview card at top on mobile) */}
+                                {/* Actually, on mobile, user usually wants to see inputs. Let's add a "Preview" modal trigger or keep it simple. 
+                                    Screenshot implies input focus. We added "Save/Copy" at top. */}
+                            </div>
+                        )}
+                        
+                        {/* Desktop Config Slide-over */}
+                        {showConfigDesktop && (
+                             <div className="absolute right-0 top-0 bottom-0 w-80 bg-white border-l border-gray-200 shadow-2xl z-30 flex flex-col animate-enter">
+                                <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                                    <h3 className="font-bold">词库配置</h3>
+                                    <button onClick={() => setShowConfigDesktop(false)}><Icons.Check size={18}/></button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    <ConfigPanel options={options} setOptions={setOptions} /> {/* Reuse Component */}
+                                </div>
+                             </div>
+                        )}
+                    </div>
+                </div>
+            )
+        }
+
+        // --- Small Components ---
+
+        function InputCard({ label, value, onChange, options, accentColor }) {
+            const [focused, setFocused] = useState(false);
+            const [showOpts, setShowOpts] = useState(false);
+            const ref = useRef(null);
+
+            // Close opts on click outside
+            useEffect(() => {
+                const h = (e) => { if(ref.current && !ref.current.contains(e.target)) setShowOpts(false); }
+                document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
+            }, []);
+
+            return (
+                <div ref={ref} className={`relative bg-white rounded-xl border transition-all duration-200 ${focused ? 'border-primary-400 ring-4 ring-primary-50 shadow-md z-10' : 'border-gray-200 hover:border-gray-300 shadow-sm'}`}>
+                    {/* Color Indicator */}
+                    <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${accentColor.replace('border-', 'bg-')}`}></div>
+                    
+                    <div className="pl-4 pr-3 py-2">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</label>
+                        <div className="flex items-center">
+                            <input 
+                                value={value}
+                                onChange={(e) => onChange(e.target.value)}
+                                onFocus={() => { setFocused(true); setShowOpts(true); }}
+                                onBlur={() => setTimeout(() => setFocused(false), 200)}
+                                className="flex-1 text-sm text-gray-800 placeholder-gray-300 bg-transparent focus:outline-none"
+                                placeholder={`输入 ${label}...`}
+                            />
+                            <button onClick={() => setShowOpts(!showOpts)} className="p-1 text-gray-300 hover:text-primary-500 transition-colors">
+                                <Icons.ChevronDown size={16} className={`transition-transform ${showOpts ? 'rotate-180' : ''}`}/>
+                            </button>
+                        </div>
+                    </div>
+
+                    {showOpts && options.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 max-h-48 overflow-y-auto custom-scrollbar">
+                            {options.map((opt, i) => (
+                                <button 
+                                    key={i} 
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-primary-50 hover:text-primary-700 transition-colors truncate"
+                                    onClick={() => { onChange(opt); setShowOpts(false); }}
+                                >
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )
+        }
+        
+        // Re-implementing Highlight correctly
+        function HighlightText({ text, values, variables }) {
+            const parts = text.split(/(\{\{[^}]+\}\})/g);
+            return (
+                <span>
+                    {parts.map((part, i) => {
+                        if (part.startsWith('{{') && part.endsWith('}}')) {
+                            const key = part.slice(2, -2).trim();
+                            if (variables.includes(key)) {
+                                const val = values[key];
+                                const isFilled = val && val.length > 0;
+                                return (
+                                    <span key={i} className={`inline-block mx-0.5 px-1 rounded transition-colors ${isFilled ? 'bg-indigo-50 text-indigo-600 font-bold border-b border-indigo-300' : 'bg-yellow-50 text-yellow-600 border-b border-dashed border-yellow-400'}`}>
+                                        {isFilled ? val : part}
+                                    </span>
+                                )
+                            }
+                        }
+                        return <span key={i}>{part}</span>
+                    })}
+                </span>
+            )
+        }
+
+        function ConfigPanel({ options, setOptions }) {
+            const [activeKey, setActiveKey] = useState(Object.keys(options)[0]);
+            const [input, setInput] = useState('');
+
+            const add = () => { if(input.trim()){ setOptions(p => ({...p, [activeKey]: [...p[activeKey], input.trim()]})); setInput(''); }};
+            const del = (idx) => { setOptions(p => ({...p, [activeKey]: p[activeKey].filter((_,i)=>i!==idx)})); };
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                        {Object.keys(options).map(k => (
+                            <button key={k} onClick={()=>setActiveKey(k)} className={`px-3 py-1 text-xs rounded-full border transition-all ${activeKey===k ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`}>
+                                {k}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex gap-2 mb-4">
+                            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-500" placeholder="添加新候选项..."/>
+                            <button onClick={add} className="px-3 bg-primary-600 text-white rounded-lg"><Icons.Plus size={20}/></button>
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                            {options[activeKey]?.map((opt, i) => (
+                                <div key={i} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg group hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-100 transition-all">
+                                    <span className="text-sm text-gray-700">{opt}</span>
+                                    <button onClick={()=>del(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash2 size={14}/></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        function NavBtn({ icon: I, label, active, onClick }) {
+            return (
+                <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${active ? 'text-primary-600' : 'text-gray-400'}`}>
+                    <I size={22} className={active ? 'stroke-[2.5px]' : ''}/>
+                    <span className="text-[10px] font-medium">{label}</span>
+                </button>
+            )
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

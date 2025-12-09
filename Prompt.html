@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>提示词填空器 (Prompt Fill Tool)</title>
     
     <!-- 加载 Tailwind CSS -->
@@ -12,593 +12,607 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- 加载 Babel 解析器 (用于浏览器直接运行 JSX) -->
+    <!-- 加载 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        /* 自定义滚动条样式 */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+        /* 基础样式修正 */
+        body {
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none; /* 防止iOS橡皮筋效果影响底部导航 */
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #e5e7eb;
-            border-radius: 20px;
-        }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-            background-color: #d1d5db;
-        }
+
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 自定义滚动条 */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
         
-        /* 隐藏滚动条但保留功能 */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
+        /* 动画 */
+        .animate-enter { animation: enter 0.2s ease-out forwards; }
+        @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 移动端安全区域适配 */
-        .safe-area-bottom {
-            padding-bottom: env(safe-area-inset-bottom);
-        }
-
-        /* 遮罩渐变 */
-        .mask-gradient-right {
-            -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
-            mask-image: linear-gradient(to right, black 90%, transparent 100%);
-        }
-
-        /* 动画关键帧 */
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes slideIn {
-            from { transform: translateY(-10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-out forwards;
-        }
-        .animate-slide-in {
-            animation: slideIn 0.2s ease-out forwards;
-        }
+        /* 底部安全区适配 (iPhone X+) */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+        .bottom-nav-height { height: calc(3.5rem + env(safe-area-inset-bottom)); }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans overflow-hidden">
-    <div id="root"></div>
+<body class="bg-gray-50 text-gray-800 font-sans h-[100dvh] w-full overflow-hidden flex flex-col">
+    <div id="root" class="h-full w-full flex flex-col"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- 图标组件 (SVG) ---
-        // 为了确保单文件运行，手动定义所有用到的图标
-        const Icon = ({ path, size = 16, className = "" }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className}
-            >
-                {path}
-            </svg>
+        const Icon = ({ path, size = 20, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
         );
 
         const Icons = {
-            Settings: (props) => <Icon {...props} path={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} />,
-            Copy: (props) => <Icon {...props} path={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>} />,
-            Edit3: (props) => <Icon {...props} path={<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>} />,
-            Eye: (props) => <Icon {...props} path={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>} />,
-            ChevronDown: (props) => <Icon {...props} path={<polyline points="6 9 12 15 18 9"/>} />,
-            Plus: (props) => <Icon {...props} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />,
-            Trash2: (props) => <Icon {...props} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />,
-            Menu: (props) => <Icon {...props} path={<><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>} />,
-            X: (props) => <Icon {...props} path={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} />,
-            RefreshCw: (props) => <Icon {...props} path={<><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>} />,
-            LayoutTemplate: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></>} />,
-            User: (props) => <Icon {...props} path={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>} />,
-            Activity: (props) => <Icon {...props} path={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>} />,
-            Image: (props) => <Icon {...props} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />,
-            Package: (props) => <Icon {...props} path={<><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>} />,
-            MapPin: (props) => <Icon {...props} path={<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>} />
+            FileText: (p) => <Icon {...p} path={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>} />,
+            Settings: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>} />,
+            Edit: (p) => <Icon {...p} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />,
+            Plus: (p) => <Icon {...p} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />,
+            Trash: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>} />,
+            Copy: (p) => <Icon {...p} path={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>} />,
+            ChevronRight: (p) => <Icon {...p} path={<polyline points="9 18 15 12 9 6"/>} />,
+            Check: (p) => <Icon {...p} path={<polyline points="20 6 9 17 4 12"/>} />,
+            Globe: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>} />,
+            MoreHorizontal: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></>} />,
+            Refresh: (p) => <Icon {...p} path={<><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>} />,
+            ChevronDown: (p) => <Icon {...p} path={<polyline points="6 9 12 15 18 9"/>} />,
+            Activity: (p) => <Icon {...p} path={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>} />,
+            User: (p) => <Icon {...p} path={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>} />,
+            Image: (p) => <Icon {...p} path={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />,
+            Package: (p) => <Icon {...p} path={<><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>} />,
+            MapPin: (p) => <Icon {...p} path={<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>} />
         };
 
-        // --- 默认数据 ---
-
-        const DEFAULT_TEMPLATE = `Role (角色设定)
-你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图（Character Sheet）。你具备“像素级拆解”的能力，能够透视角色的穿着层级、捕捉微表情变化，并将与其相关的物品进行具象化还原。你特别擅长通过 {{subject}} 的私密物品、随身物件和生活细节来侧面丰满人物性格与背景故事。
+        // --- 初始数据预设 ---
+        const DEFAULT_TEMPLATES = [
+            {
+                id: 't1',
+                title: '角色概念分解图',
+                content: `Role (角色设定)
+你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图。你具备“像素级拆解”的能力。
 
 Task (任务目标)
-根据用户上传或描述的主体形象，生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情、核心道具、材质特写，以及极具生活气息的私密与随身物品展示。
+生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情。
 
 Visual Guidelines (视觉规范)
-1. 构图布局(Layout):
-•中心位(Center): 放置角色的 {{layout_focus}} ，作为视觉锚点。
-•环绕位(Surroundings): 在中心人物四周空白处，有序排列拆解后的元素。
-•视觉引导(Connectors): 使用 {{connectors}} ，将周边的拆解物品与中心人物的对应部位或所属区域连接起来。
+1. 构图布局: 中心位放置角色的 {{layout_focus}} 。
+2. 拆解内容:
+•服装分层: 例如： {{clothing}}
+•私密内着: 例如： {{underwear_style}}
+•表情集: 如： {{expressions}}
+•材质特写: 例如： {{texture_zoom}}
+•动作: 例如： {{action_detail}}
 
-2. 拆解内容(Deconstruction Details):
-•服装分层(Clothing Layers): 将角色的服装拆分为单品展示，例如： {{clothing}}
-•私密内着拆解: 独立展示角色的内层衣物，重点突出设计感与材质。例如： {{underwear_style}} （展示细节与剪裁）。
-•表情集(Expression Sheet): 在角落绘制3-4 个不同的头部特写，展示不同的情绪，如： {{expressions}} 。
-•材质特写(Texture & Zoom): 选取关键部位进行放大特写。例如： {{texture_zoom}} ，增加对小物件材质的描绘。
-•动作: 绘制特殊的动作和表情，例如： {{action_detail}} ，增加动作的深度刻画。
-•特殊视角: 绘制从某种特殊场景下拍摄的特殊视角，例如： {{special_view}}
-•关联物品(Related Items):
-•随身包袋与内容物: 绘制 {{bag_content}} ，并将其“打开”，展示散落在旁的物品。
-•美妆与护理: 展示 {{cosmetics}} 。
-•私密生活物件: 具象化角色隐藏面的物品。根据角色性格可能包括： {{private_items}} ，需以一种设计图的客观视角呈现。
-
-3. 风格与注释(Style & Annotations):
-•画风: {{art_style}} ，线条干净利落。
-•背景: {{background_style}} ，营造设计手稿的氛围。
-•灯光: {{lighting}}
-`;
+3. 风格与注释:
+•画风: {{art_style}}
+•背景: {{background_style}}
+•灯光: {{lighting}}`
+            },
+            {
+                id: 't2',
+                title: '3x3 摄影网格',
+                content: `创建一个 3x3 的摄影网格，展示 {{subject}} 的不同角度。
+风格: {{art_style}}
+光线: {{lighting}}
+每个格子应该展示: {{action_pose}}`
+            },
+            {
+                id: 't3',
+                title: '时尚情绪板插画',
+                content: `创建一个关于 {{clothing}} 的时尚情绪板。
+配色方案: {{background_style}}
+模特姿势: {{grid_pose}}
+细节重点: {{fashion_deconstruct}}`
+            },
+            {
+                id: 't4',
+                title: '人物趣味合影',
+                content: `绘制 {{subject}} 和 {{character_companion}} 的趣味合影。
+场景: {{background_scene}}
+互动: {{action_pose}}
+表情: {{expressions}}`
+            }
+        ];
 
         const VARIABLE_GROUPS = {
-          character: { label: "人物 (CHARACTER)", keys: ["role", "subject", "character_companion", "expressions"], icon: "User" },
-          action: { label: "动作 (ACTION)", keys: ["grid_pose", "action_detail", "action_pose"], icon: "Activity" },
-          visuals: { label: "画面 (VISUALS)", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"], icon: "Image" },
-          item: { label: "物品 (ITEM)", keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"], icon: "Package" },
-          location: { label: "地点 (LOCATION)", keys: ["background_scene"], icon: "MapPin" }
+            character: { label: "人物 (CHARACTER)", keys: ["role", "subject", "character_companion", "expressions"], icon: "User" },
+            action: { label: "动作 (ACTION)", keys: ["grid_pose", "action_detail", "action_pose"], icon: "Activity" },
+            visuals: { label: "画面 (VISUALS)", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"], icon: "Image" },
+            item: { label: "物品 (ITEM)", keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"], icon: "Package" },
+            location: { label: "地点 (LOCATION)", keys: ["background_scene"], icon: "MapPin" }
         };
 
         const DEFAULT_OPTIONS = {
-          role: ["游戏与动漫概念美术设计大师", "资深时尚摄影师", "电影分镜师"],
-          subject: ["女性角色", "赛博朋克黑客", "奇幻精灵游侠", "现代都市白领"],
-          layout_focus: ["全身立绘", "半身像", "特写镜头"],
-          connectors: ["手绘箭头或引导线", "虚线连接", "光效指引"],
-          clothing: ["机能风外套", "丝绸长裙", "战斗装甲"],
-          underwear_style: ["成套的蕾丝内衣裤", "运动内衣", "棉质简约款"],
-          expressions: ["疯狂、病娇、狂喜", "冷漠、轻蔑、无视", "羞涩、脸红、躲闪"],
-          texture_zoom: ["凌乱感与私处汗渍", "皮革纹理与磨损", "金属光泽与锈迹"],
-          action_detail: ["带着项圈的爬行", "拔剑战斗姿态", "优雅的下午茶时光"],
-          special_view: ["被踩在脚下的仰视视角", "上帝视角俯瞰", "鱼眼镜头特写"],
-          bag_content: ["日常通勤包或手拿包", "战术背包", "魔法药剂袋"],
-          cosmetics: ["常用的化妆品组合", "战地急救包", "魔法符文绘制工具"],
-          private_items: ["震动棒与项圈", "日记本与旧照片", "护身符与水晶"],
-          art_style: ["高质量的2D 插画风格", "吉卜力动画风格", "厚涂油画风格"],
-          background_style: ["漫画网格笔记本", "纯色极简背景", "赛博朋克霓虹街道"],
-          lighting: ["自然光", "赛博霓虹光", "伦勃朗光"],
+            role: ["游戏概念设计师", "时尚摄影师", "电影导演"],
+            subject: ["赛博朋克黑客", "森林精灵", "都市白领", "机甲战士"],
+            art_style: ["2D 插画", "吉卜力风格", "写实摄影", "油画"],
+            layout_focus: ["全身立绘", "半身像", "头部特写"],
+            lighting: ["自然光", "赛博霓虹", "伦勃朗光"],
+            expressions: ["冷漠", "狂喜", "羞涩"],
+            clothing: ["机能风外套", "丝绸长裙", "战术背心"],
+            background_style: ["纯色背景", "赛博街道", "魔法森林"]
         };
 
-        // --- 主组件 ---
+        // --- 应用主入口 ---
+        function App() {
+            // 状态管理
+            const [templates, setTemplates] = useState(() => {
+                const saved = localStorage.getItem('pf_templates');
+                return saved ? JSON.parse(saved) : DEFAULT_TEMPLATES;
+            });
+            const [activeTemplateId, setActiveTemplateId] = useState(() => localStorage.getItem('pf_active_id') || 't1');
+            const [activeTab, setActiveTab] = useState('templates'); // 'templates' | 'config' | 'editor'
+            const [options, setOptions] = useState(() => {
+                const saved = localStorage.getItem('pf_options');
+                return saved ? JSON.parse(saved) : DEFAULT_OPTIONS;
+            });
+            const [fillValues, setFillValues] = useState({});
 
-        function PromptFill() {
-            const [templateContent, setTemplateContent] = useState(DEFAULT_TEMPLATE);
-            const [variableValues, setVariableValues] = useState({});
-            const [variableOptions, setVariableOptions] = useState(DEFAULT_OPTIONS);
-            const [mode, setMode] = useState('preview'); // 'preview' or 'edit'
-            const [activeTab, setActiveTab] = useState('fill'); // 'fill' or 'config'
-            const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-            const [copySuccess, setCopySuccess] = useState(false);
-
+            // 监听保存
             useEffect(() => {
-                if (window.innerWidth >= 1024) {
-                    setIsSidebarOpen(true);
-                }
-            }, []);
+                localStorage.setItem('pf_templates', JSON.stringify(templates));
+                localStorage.setItem('pf_active_id', activeTemplateId);
+                localStorage.setItem('pf_options', JSON.stringify(options));
+            }, [templates, activeTemplateId, options]);
 
-            // 提取变量
+            // 获取当前模版
+            const currentTemplate = useMemo(() => 
+                templates.find(t => t.id === activeTemplateId) || templates[0]
+            , [templates, activeTemplateId]);
+
+            // CRUD 操作
+            const handleAddTemplate = () => {
+                const newId = 't' + Date.now();
+                const newTemplate = { id: newId, title: '未命名模版', content: '在这里输入你的 Prompt 模版，使用 {{variable}} 作为变量...' };
+                setTemplates([...templates, newTemplate]);
+                setActiveTemplateId(newId);
+                // 如果是移动端，新建后可能想直接去编辑，但保持在模版页更符合直觉
+            };
+
+            const handleDeleteTemplate = (e, id) => {
+                e.stopPropagation();
+                if (templates.length <= 1) return alert("至少保留一个模版");
+                if (!confirm("确定删除此模版吗？")) return;
+                const newTemplates = templates.filter(t => t.id !== id);
+                setTemplates(newTemplates);
+                if (activeTemplateId === id) setActiveTemplateId(newTemplates[0].id);
+            };
+
+            const handleUpdateTemplate = (id, field, value) => {
+                setTemplates(templates.map(t => t.id === id ? { ...t, [field]: value } : t));
+            };
+
+            // 渲染逻辑：根据 activeTab 决定显示哪个视图（移动端逻辑）
+            // 在桌面端，我们可能希望同时显示列表和编辑器，这里为了复刻截图，我们采用统一的三段式逻辑，但为桌面做适配布局
+
+            return (
+                <div className="flex flex-col h-full bg-gray-50">
+                    
+                    {/* 主要内容区域 - 使用 CSS Grid/Flex 在桌面端分栏 */}
+                    <div className="flex-1 overflow-hidden relative lg:flex lg:flex-row">
+                        
+                        {/* 移动端视图路由 & 桌面端侧边栏 */}
+                        {/* 1. 模版管理 (Templates) */}
+                        <div className={`
+                            absolute inset-0 bg-gray-50 flex flex-col overflow-hidden transition-transform duration-300
+                            ${activeTab === 'templates' ? 'translate-x-0 z-10' : '-translate-x-full z-0'}
+                            lg:relative lg:translate-x-0 lg:w-80 lg:border-r lg:border-gray-200 lg:z-auto
+                        `}>
+                            <header className="px-5 py-4 flex items-center justify-between bg-white shrink-0">
+                                <div>
+                                    <h1 className="text-lg font-bold text-gray-900">提示词填空器 <span className="text-xs font-normal text-gray-400">V0.3.1</span></h1>
+                                    <p className="text-xs text-gray-400 mt-0.5">模版管理</p>
+                                </div>
+                                <button className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600 flex items-center gap-1">
+                                    <Icons.Globe size={12} /> CN
+                                </button>
+                            </header>
+
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24 lg:pb-4 custom-scrollbar">
+                                {templates.map(t => (
+                                    <div 
+                                        key={t.id}
+                                        onClick={() => {
+                                            setActiveTemplateId(t.id);
+                                            // 移动端选中后跳转到 Editor，或者仅仅选中？截图显示选中态
+                                            // 截图中的逻辑是选中了一个 active 的，然后可以去 Editor tab 编辑
+                                            // 这里我们选中即 Active
+                                        }}
+                                        className={`
+                                            group relative p-4 rounded-xl border transition-all active:scale-[0.98] cursor-pointer
+                                            ${t.id === activeTemplateId 
+                                                ? 'bg-white border-blue-200 shadow-md shadow-blue-100 ring-1 ring-blue-100' 
+                                                : 'bg-white border-transparent shadow-sm hover:border-gray-200'}
+                                        `}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-1 h-8 rounded-full ${t.id === activeTemplateId ? 'bg-blue-600' : 'bg-transparent'}`}></div>
+                                            <div className="flex-1 min-w-0">
+                                                {/* 标题可编辑 */}
+                                                <input 
+                                                    value={t.title}
+                                                    onChange={(e) => handleUpdateTemplate(t.id, 'title', e.target.value)}
+                                                    className={`w-full bg-transparent font-medium truncate focus:outline-none ${t.id === activeTemplateId ? 'text-gray-900' : 'text-gray-600'}`}
+                                                    onClick={(e) => e.stopPropagation()} // 防止触发卡片点击
+                                                />
+                                            </div>
+                                            {t.id === activeTemplateId && (
+                                                <div className="flex items-center gap-2">
+                                                    <button 
+                                                        onClick={() => { setActiveTab('editor'); }}
+                                                        className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                                                    >
+                                                        <Icons.Edit size={14} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => handleDeleteTemplate(e, t.id)}
+                                                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors"
+                                                    >
+                                                        <Icons.Trash size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* 新建模版按钮 (复刻截图) */}
+                            <div className="absolute bottom-4 left-4 right-4 lg:relative lg:bottom-0 lg:left-0 lg:right-0 lg:p-4 lg:bg-gray-50">
+                                <button 
+                                    onClick={handleAddTemplate}
+                                    className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                                >
+                                    <Icons.Plus size={20} /> 新建模版
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 2. 词库配置 (Config) */}
+                        <div className={`
+                            absolute inset-0 bg-gray-50 flex flex-col overflow-hidden transition-transform duration-300
+                            ${activeTab === 'config' ? 'translate-x-0 z-10' : activeTab === 'templates' && window.innerWidth < 1024 ? 'translate-x-full z-0' : '-translate-x-full z-0'}
+                            lg:relative lg:translate-x-0 lg:flex-1 lg:border-r lg:border-gray-200 lg:z-auto lg:hidden
+                        `}>
+                            {/* 桌面端只有选中特定tab才显示，但在手机端是全屏。
+                                为了简化，桌面端我们把 config 做成弹窗或者侧边抽屉？
+                                不，桌面端我们可以让它占据中间列。
+                            */}
+                            <header className="px-5 py-4 border-b border-gray-100 bg-white shrink-0 lg:hidden">
+                                <h1 className="text-lg font-bold text-gray-900">词库配置</h1>
+                            </header>
+                             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar pb-24">
+                                <ConfigView options={options} setOptions={setOptions} />
+                             </div>
+                        </div>
+
+                        {/* 3. 填空编辑器 (Editor) - 桌面端始终显示的核心区域 */}
+                        <div className={`
+                            absolute inset-0 bg-gray-100 flex flex-col overflow-hidden transition-transform duration-300
+                            ${activeTab === 'editor' ? 'translate-x-0 z-10' : 'translate-x-full z-0'}
+                            lg:relative lg:translate-x-0 lg:flex-[2] lg:z-auto
+                        `}>
+                            <EditorView 
+                                template={currentTemplate} 
+                                updateTemplate={(val) => handleUpdateTemplate(currentTemplate.id, 'content', val)}
+                                options={options}
+                                values={fillValues}
+                                setValues={setFillValues}
+                                variableGroups={VARIABLE_GROUPS}
+                            />
+                        </div>
+
+                    </div>
+
+                    {/* 底部导航栏 (Bottom Navigation) - 移动端专属 */}
+                    <div className="lg:hidden bg-white border-t border-gray-100 flex justify-around items-center pb-safe bottom-nav-height shrink-0 z-50 shadow-sm relative">
+                        <NavButton 
+                            icon={Icons.FileText} 
+                            label="模版管理" 
+                            isActive={activeTab === 'templates'} 
+                            onClick={() => setActiveTab('templates')} 
+                        />
+                        <NavButton 
+                            icon={Icons.Settings} 
+                            label="词库配置" 
+                            isActive={activeTab === 'config'} 
+                            onClick={() => setActiveTab('config')} 
+                        />
+                        <NavButton 
+                            icon={Icons.Edit} 
+                            label="Editor" 
+                            isActive={activeTab === 'editor'} 
+                            onClick={() => setActiveTab('editor')} 
+                        />
+                    </div>
+                </div>
+            );
+        }
+
+        // --- 子视图组件 ---
+
+        // 导航按钮
+        function NavButton({ icon: IconComp, label, isActive, onClick }) {
+            return (
+                <button 
+                    onClick={onClick}
+                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <IconComp size={24} className={isActive ? "stroke-[2.5px]" : "stroke-2"} />
+                    <span className="text-[10px] font-medium">{label}</span>
+                </button>
+            );
+        }
+
+        // 填空编辑器逻辑
+        function EditorView({ template, updateTemplate, options, values, setValues, variableGroups }) {
+            const [mode, setMode] = useState('fill'); // 'fill' or 'code'
+            const [copyState, setCopyState] = useState('idle'); // idle, copied
+
+            // 解析变量
             const variables = useMemo(() => {
                 const regex = /\{\{([^}]+)\}\}/g;
                 const found = new Set();
                 let match;
-                while ((match = regex.exec(templateContent)) !== null) {
+                while ((match = regex.exec(template.content)) !== null) {
                     found.add(match[1].trim());
                 }
                 return Array.from(found);
-            }, [templateContent]);
+            }, [template.content]);
 
-            // 分组逻辑
-            const groupedVariables = useMemo(() => {
-                const groups = {
-                    character: [], action: [], visuals: [], item: [], location: [], other: []
-                };
-
-                variables.forEach(key => {
-                    let found = false;
-                    for (const [groupKey, config] of Object.entries(VARIABLE_GROUPS)) {
-                        if (config.keys.includes(key)) {
-                            groups[groupKey].push(key);
-                            found = true;
+            // 分组变量
+            const groupedVars = useMemo(() => {
+                const groups = { other: [] };
+                Object.keys(variableGroups).forEach(k => groups[k] = []);
+                
+                variables.forEach(v => {
+                    let matched = false;
+                    for (const [gKey, gCfg] of Object.entries(variableGroups)) {
+                        if (gCfg.keys.includes(v)) {
+                            groups[gKey].push(v);
+                            matched = true;
                             break;
                         }
                     }
-                    if (!found) groups.other.push(key);
+                    if (!matched) groups.other.push(v);
                 });
                 return groups;
-            }, [variables]);
+            }, [variables, variableGroups]);
 
-            // 生成文本
-            const generatedText = useMemo(() => {
-                let text = templateContent;
-                variables.forEach(key => {
-                    const value = variableValues[key] || `{{${key}}}`;
-                    text = text.split(`{{${key}}}`).join(value);
+            // 生成预览文本
+            const resultText = useMemo(() => {
+                let txt = template.content;
+                variables.forEach(v => {
+                    const val = values[v] || `{{${v}}}`;
+                    txt = txt.split(`{{${v}}}`).join(val);
                 });
-                return text;
-            }, [templateContent, variableValues, variables]);
+                return txt;
+            }, [template.content, values, variables]);
 
             const handleCopy = () => {
-                navigator.clipboard.writeText(generatedText).then(() => {
-                    setCopySuccess(true);
-                    setTimeout(() => setCopySuccess(false), 2000);
-                });
-            };
-
-            const resetValues = () => {
-                if(confirm('确定要清空所有已填写的内容吗？')) {
-                    setVariableValues({});
-                }
+                navigator.clipboard.writeText(resultText);
+                setCopyState('copied');
+                setTimeout(() => setCopyState('idle'), 2000);
             };
 
             return (
-                <div className="flex h-[100dvh] w-full bg-gray-50 text-gray-800 font-sans overflow-hidden relative">
-                    
-                    {/* Mobile Overlay */}
-                    {isSidebarOpen && (
-                        <div 
-                            className="lg:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity animate-fade-in"
-                            onClick={() => setIsSidebarOpen(false)}
-                        />
-                    )}
-
-                    {/* Mobile Toggle */}
-                    <button 
-                        className="lg:hidden fixed top-3 right-3 z-50 p-2.5 bg-white rounded-full shadow-lg border border-gray-100 active:scale-95 transition-transform"
-                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                    >
-                        {isSidebarOpen ? <Icons.X size={20} className="text-gray-600" /> : <Icons.Menu size={20} className="text-gray-800" />}
-                    </button>
-
-                    {/* SIDEBAR */}
-                    <div className={`
-                        fixed inset-y-0 left-0 z-50 w-[85%] sm:w-[400px] lg:w-[400px] bg-white border-r border-gray-200 shadow-2xl lg:shadow-none transform transition-transform duration-300 ease-out flex flex-col
-                        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                        lg:relative lg:translate-x-0
-                    `}>
-                        {/* Sidebar Header */}
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                                    提示词填空器 
-                                    <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded font-mono">V0.3.1</span>
-                                </h1>
-                                <p className="text-xs text-gray-400 mt-1 font-medium">Prompt Fill Tool</p>
-                            </div>
+                <div className="flex flex-col h-full">
+                    {/* Toolbar */}
+                    <div className="px-4 py-3 bg-white border-b border-gray-100 flex items-center justify-between shrink-0">
+                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <button onClick={() => setMode('fill')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${mode === 'fill' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>预览交互</button>
+                            <button onClick={() => setMode('code')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${mode === 'code' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>编辑模版</button>
                         </div>
-
-                        {/* Tabs */}
-                        <div className="flex border-b border-gray-200 shrink-0">
-                            <button 
-                                onClick={() => setActiveTab('fill')}
-                                className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'fill' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-                            >
-                                <Icons.Edit3 size={16} /> 填空模式
+                        <div className="flex gap-2">
+                            <button onClick={() => setValues({})} className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50">
+                                <Icons.Refresh size={18} />
                             </button>
-                            <button 
-                                onClick={() => setActiveTab('config')}
-                                className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'config' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-                            >
-                                <Icons.Settings size={16} /> 词库配置
-                            </button>
-                        </div>
-
-                        {/* Scrollable Content */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar overscroll-contain pb-24">
-                            {activeTab === 'fill' ? (
-                                <>
-                                    {Object.entries(groupedVariables).map(([groupKey, vars]) => {
-                                        if (vars.length === 0) return null;
-                                        const groupConfig = VARIABLE_GROUPS[groupKey];
-                                        const label = groupConfig ? groupConfig.label : "其他变量 (OTHER)";
-                                        const GroupIcon = groupConfig && Icons[groupConfig.icon] ? Icons[groupConfig.icon] : Icons.Settings;
-
-                                        return (
-                                            <div key={groupKey} className="space-y-3 animate-fade-in">
-                                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 sticky top-0 bg-white/95 backdrop-blur-sm py-2 z-10 border-b border-dashed border-gray-100">
-                                                    <GroupIcon size={12} />
-                                                    {label}
-                                                    <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full text-[10px] font-mono">{vars.length}</span>
-                                                </h3>
-                                                <div className="space-y-3 pl-1">
-                                                    {vars.map(key => (
-                                                        <VariableControl 
-                                                            key={key} 
-                                                            varKey={key} 
-                                                            value={variableValues[key] || ''} 
-                                                            options={variableOptions[key] || []}
-                                                            onChange={(val) => setVariableValues(prev => ({...prev, [key]: val}))}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </>
-                            ) : (
-                                <WordBankConfig 
-                                    variables={variables} 
-                                    options={variableOptions} 
-                                    setOptions={setVariableOptions} 
-                                />
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="p-4 border-t border-gray-200 bg-gray-50 shrink-0 safe-area-bottom">
-                            <button 
-                                onClick={resetValues}
-                                className="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"
-                            >
-                                <Icons.RefreshCw size={16} /> 清空当前填写
+                            <button onClick={handleCopy} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${copyState === 'copied' ? 'bg-green-500 text-white' : 'bg-black text-white active:scale-95'}`}>
+                                {copyState === 'copied' ? <Icons.Check size={14}/> : <Icons.Copy size={14}/>}
+                                {copyState === 'copied' ? '已复制' : '复制结果'}
                             </button>
                         </div>
                     </div>
 
-                    {/* MAIN AREA */}
-                    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-100/50 relative w-full">
-                        {/* Toolbar */}
-                        <div className="h-16 px-4 lg:px-6 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm z-30 shrink-0">
-                            <div className="flex items-center gap-2 lg:gap-4 overflow-x-auto no-scrollbar mask-gradient-right pr-4">
-                                <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-                                    <button 
-                                        onClick={() => setMode('preview')}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${mode === 'preview' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                                    >
-                                        <Icons.Eye size={14} /> <span className="hidden sm:inline">预览结果</span><span className="sm:hidden">预览</span>
-                                    </button>
-                                    <button 
-                                        onClick={() => setMode('edit')}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${mode === 'edit' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                                    >
-                                        <Icons.LayoutTemplate size={14} /> <span className="hidden sm:inline">编辑模版</span><span className="sm:hidden">编辑</span>
-                                    </button>
+                    {/* Content */}
+                    <div className="flex-1 overflow-hidden relative">
+                        {mode === 'code' ? (
+                            <textarea
+                                className="w-full h-full p-6 resize-none focus:outline-none font-mono text-sm bg-gray-50 text-gray-800 leading-relaxed"
+                                value={template.content}
+                                onChange={(e) => updateTemplate(e.target.value)}
+                                placeholder="输入模版内容..."
+                            />
+                        ) : (
+                            <div className="flex h-full flex-col lg:flex-row">
+                                {/* Left: Controls (PC) / Top: Controls (Mobile) */}
+                                {/* 我们在手机上把控件放在一个可滚动的区域，预览放在另一个Tab？
+                                    或者采用上下布局。截图暗示 "Editor" 是一个填空的地方。
+                                    为了体验，我们采用分屏：左边填空，右边预览(PC)。
+                                    手机上：上方预览(小)，下方填空(大)。
+                                */}
+                                
+                                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar pb-24 bg-gray-50/50">
+                                    {/* 手机端的 Mini Preview */}
+                                    <div className="lg:hidden mb-6 bg-white p-4 rounded-xl border border-blue-100 shadow-sm text-xs leading-relaxed font-mono text-gray-600 max-h-40 overflow-y-auto">
+                                        <HighlightText text={resultText} />
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        {Object.entries(groupedVars).map(([key, vars]) => {
+                                            if (vars.length === 0) return null;
+                                            const groupInfo = variableGroups[key];
+                                            const label = groupInfo ? groupInfo.label : "其他变量";
+                                            const GIcon = groupInfo && Icons[groupInfo.icon] ? Icons[groupInfo.icon] : Icons.Settings;
+                                            
+                                            return (
+                                                <div key={key} className="space-y-3">
+                                                    <h3 className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                                        <GIcon size={12} /> {label}
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-3">
+                                                        {vars.map(v => (
+                                                            <InputControl 
+                                                                key={v} 
+                                                                label={v} 
+                                                                value={values[v] || ''} 
+                                                                options={options[v] || []}
+                                                                onChange={val => setValues(prev => ({...prev, [v]: val}))}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        {variables.length === 0 && (
+                                            <div className="text-center py-10 text-gray-400 text-sm">
+                                                模版中没有检测到变量 {{'{{variable}}'}}
+                                                <br/>
+                                                请切换到“编辑模版”模式添加变量。
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right: Full Preview (PC only) */}
+                                <div className="hidden lg:block w-1/2 border-l border-gray-200 bg-white overflow-y-auto p-8 custom-scrollbar">
+                                     <div className="prose prose-sm max-w-none font-mono whitespace-pre-wrap leading-loose text-gray-700">
+                                        <HighlightText text={resultText} />
+                                     </div>
                                 </div>
                             </div>
-                            
-                            <div className="flex items-center gap-2 pr-8 lg:pr-0">
-                                <button 
-                                    onClick={handleCopy}
-                                    className={`px-3 lg:px-4 py-2 text-sm font-bold rounded-lg active:scale-95 transition-all flex items-center gap-2 shadow-lg whitespace-nowrap ${copySuccess ? 'bg-green-600 text-white shadow-green-200' : 'bg-black text-white hover:bg-gray-800 shadow-gray-200'}`}
-                                >
-                                    {copySuccess ? <span className="flex items-center gap-1">已复制!</span> : <><Icons.Copy size={16} /> <span className="hidden sm:inline">一键复制</span><span className="sm:hidden">复制</span></>}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-3 lg:p-6 scroll-smooth">
-                            <div className="max-w-4xl mx-auto bg-white min-h-[calc(100%-2rem)] shadow-sm border border-gray-200 rounded-xl overflow-hidden relative transition-all">
-                                {mode === 'preview' ? (
-                                    <div className="p-6 lg:p-12 whitespace-pre-wrap leading-relaxed text-gray-800 text-sm lg:text-base font-mono break-words">
-                                        <PreviewRenderer 
-                                            text={templateContent} 
-                                            variables={variables} 
-                                            values={variableValues} 
-                                        />
-                                    </div>
-                                ) : (
-                                    <textarea 
-                                        value={templateContent}
-                                        onChange={(e) => setTemplateContent(e.target.value)}
-                                        className="w-full h-full p-6 lg:p-12 bg-gray-50 text-gray-800 font-mono text-sm leading-relaxed focus:outline-none resize-none min-h-[500px]"
-                                        placeholder="输入你的 Prompt 模版，使用 {{variable}} 作为变量..."
-                                    />
-                                )}
-                            </div>
-                            <div className="h-20 lg:h-0"></div>
-                        </div>
+                        )}
                     </div>
                 </div>
             );
         }
 
-        // --- 子组件 ---
-
-        function PreviewRenderer({ text, variables, values }) {
-            if (!text) return null;
-            const pattern = new RegExp(`(\\{\\{(${variables.join('|')})\\}\\})`, 'g');
-            const parts = text.split(pattern);
-
-            return (
-                <>
-                {parts.map((part, index) => {
-                    if (variables.includes(part)) {
-                        const key = part;
-                        const value = values[key];
-                        const isFilled = value && value.length > 0;
-                        return (
-                            <span 
-                                key={index} 
-                                className={`
-                                    inline-block px-1.5 py-0.5 mx-0.5 my-0.5 rounded border border-dashed transition-all duration-200 align-middle
-                                    ${isFilled 
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium' 
-                                    : 'bg-yellow-50 border-yellow-300 text-yellow-600 font-normal text-xs lg:text-sm'}
-                                `}
-                            >
-                                {isFilled ? value : `{{${key}}}`}
-                            </span>
-                        );
-                    }
-                    if (part.startsWith('{{') && part.endsWith('}}')) return null;
-                    return <span key={index}>{part}</span>;
-                })}
-                </>
-            );
+        // 高亮显示结果中的变量部分
+        function HighlightText({ text }) {
+            // 这里简单渲染，不区分哪些是填过的。实际只要显示文本即可。
+            return <span>{text}</span>;
         }
 
-        function VariableControl({ varKey, value, options, onChange }) {
-            const [isOpen, setIsOpen] = useState(false);
-            const containerRef = useRef(null);
+        function InputControl({ label, value, options, onChange }) {
+            const [showOpts, setShowOpts] = useState(false);
+            const ref = useRef(null);
 
             useEffect(() => {
-                function handleClickOutside(event) {
-                    if (containerRef.current && !containerRef.current.contains(event.target)) {
-                        setIsOpen(false);
-                    }
-                }
-                document.addEventListener("mousedown", handleClickOutside);
-                document.addEventListener("touchstart", handleClickOutside);
-                return () => {
-                    document.removeEventListener("mousedown", handleClickOutside);
-                    document.removeEventListener("touchstart", handleClickOutside);
-                };
+                const clickOut = (e) => { if (ref.current && !ref.current.contains(e.target)) setShowOpts(false); }
+                document.addEventListener('mousedown', clickOut);
+                document.addEventListener('touchstart', clickOut);
+                return () => { document.removeEventListener('mousedown', clickOut); document.removeEventListener('touchstart', clickOut); }
             }, []);
 
             return (
-                <div className="relative group" ref={containerRef}>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1 truncate">
-                        {varKey}
-                    </label>
+                <div className="relative" ref={ref}>
                     <div className="relative">
                         <input 
-                            type="text" 
+                            className="w-full pl-3 pr-9 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                            placeholder={label}
                             value={value}
                             onChange={(e) => onChange(e.target.value)}
-                            placeholder={`输入内容...`}
-                            className="w-full pl-3 pr-8 py-3 lg:py-2.5 bg-white border border-gray-200 rounded-xl lg:rounded-lg text-base lg:text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-gray-300 shadow-sm"
-                            onFocus={() => setIsOpen(true)}
+                            onFocus={() => setShowOpts(true)}
                         />
-                        <button 
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 rounded-full active:bg-gray-100 touch-manipulation"
-                        >
-                            <Icons.ChevronDown size={16} className={`transform transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                         <div 
+                            className="absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center text-gray-400 cursor-pointer"
+                            onClick={() => setShowOpts(!showOpts)}
+                         >
+                            <Icons.ChevronDown size={16} className={`transition-transform ${showOpts ? 'rotate-180' : ''}`} />
+                        </div>
                     </div>
-
-                    {isOpen && options.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-slide-in custom-scrollbar">
-                            <div className="p-1">
-                                {options.map((opt, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => {
-                                            onChange(opt);
-                                            setIsOpen(false);
-                                        }}
-                                        className="w-full text-left px-3 py-3 lg:py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition-colors truncate active:bg-blue-100"
-                                    >
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
+                    {showOpts && options.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar animate-enter">
+                            {options.map((opt, i) => (
+                                <div 
+                                    key={i} 
+                                    onClick={() => { onChange(opt); setShowOpts(false); }}
+                                    className="px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 active:bg-blue-100 cursor-pointer border-b border-gray-50 last:border-0 truncate"
+                                >
+                                    {opt}
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
-            );
+            )
         }
 
-        function WordBankConfig({ variables, options, setOptions }) {
-            const [selectedVar, setSelectedVar] = useState(variables[0] || '');
-            const [newOption, setNewOption] = useState('');
-            const currentOptions = options[selectedVar] || [];
+        function ConfigView({ options, setOptions }) {
+            const keys = Object.keys(options);
+            const [activeKey, setActiveKey] = useState(keys[0]);
+            const [newOpt, setNewOpt] = useState('');
 
-            const addOption = () => {
-                if (!newOption.trim()) return;
+            const add = () => {
+                if (!newOpt.trim()) return;
                 setOptions(prev => ({
                     ...prev,
-                    [selectedVar]: [...(prev[selectedVar] || []), newOption.trim()]
+                    [activeKey]: [...(prev[activeKey]||[]), newOpt.trim()]
                 }));
-                setNewOption('');
-            };
+                setNewOpt('');
+            }
 
-            const removeOption = (idx) => {
+            const del = (idx) => {
                 setOptions(prev => ({
                     ...prev,
-                    [selectedVar]: prev[selectedVar].filter((_, i) => i !== idx)
+                    [activeKey]: prev[activeKey].filter((_, i) => i !== idx)
                 }));
-            };
-
-            if (!selectedVar && variables.length > 0) setSelectedVar(variables[0]);
+            }
 
             return (
-                <div className="space-y-6">
-                    <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                        <h3 className="text-sm font-semibold text-blue-900 mb-2">配置说明</h3>
-                        <p className="text-xs text-blue-700 leading-relaxed">
-                            在这里管理每个变量的候选项。添加的选项将在“填空模式”的下拉菜单中显示。
-                        </p>
+                <div className="space-y-4">
+                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                        {keys.map(k => (
+                            <button
+                                key={k}
+                                onClick={() => setActiveKey(k)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${activeKey === k ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200'}`}
+                            >
+                                {k}
+                            </button>
+                        ))}
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">选择变量</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {variables.map(v => (
-                                <button
-                                    key={v}
-                                    onClick={() => setSelectedVar(v)}
-                                    className={`text-xs px-3 py-2.5 rounded-lg border text-left truncate transition-colors ${
-                                        selectedVar === v 
-                                        ? 'bg-gray-800 text-white border-gray-800 shadow-md' 
-                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 active:bg-gray-50'
-                                    }`}
-                                >
-                                    {v}
-                                </button>
+                    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center justify-between">
+                            {activeKey}
+                            <span className="text-xs font-normal text-gray-400">{options[activeKey]?.length || 0} 个选项</span>
+                        </h3>
+                        
+                        <div className="flex gap-2 mb-4">
+                            <input 
+                                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:bg-white focus:border-blue-500 transition-colors"
+                                placeholder="添加新选项..."
+                                value={newOpt}
+                                onChange={e => setNewOpt(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && add()}
+                            />
+                            <button onClick={add} className="px-3 py-2 bg-blue-600 text-white rounded-lg active:scale-95 transition-transform"><Icons.Plus size={18}/></button>
+                        </div>
+
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
+                            {options[activeKey]?.map((opt, i) => (
+                                <div key={i} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg group">
+                                    <span className="text-sm text-gray-700">{opt}</span>
+                                    <button onClick={() => del(i)} className="text-gray-300 hover:text-red-500 p-1"><Icons.Trash size={14}/></button>
+                                </div>
                             ))}
                         </div>
                     </div>
-
-                    {selectedVar && (
-                        <div className="space-y-3 pt-4 border-t border-gray-100">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                    {selectedVar} 的选项 ({currentOptions.length})
-                                </label>
-                            </div>
-                            
-                            <div className="flex gap-2">
-                                <input 
-                                    value={newOption}
-                                    onChange={(e) => setNewOption(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && addOption()}
-                                    className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base lg:text-sm focus:outline-none focus:border-blue-500"
-                                    placeholder="添加新选项..."
-                                />
-                                <button 
-                                    onClick={addOption}
-                                    className="px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors active:scale-95"
-                                >
-                                    <Icons.Plus size={18} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                                {currentOptions.map((opt, idx) => (
-                                    <div key={idx} className="group flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-all">
-                                        <span className="text-sm text-gray-700">{opt}</span>
-                                        <button 
-                                            onClick={() => removeOption(idx)}
-                                            className="text-gray-300 hover:text-red-500 p-1 transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-                                        >
-                                            <Icons.Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
-            );
+            )
         }
 
-        // --- 启动应用 ---
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<PromptFill />);
+        root.render(<App />);
     </script>
 </body>
 </html>

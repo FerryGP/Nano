@@ -1,0 +1,541 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { 
+  Settings, 
+  Copy, 
+  Save, 
+  Edit3, 
+  Eye, 
+  ChevronDown, 
+  ChevronRight, 
+  Plus, 
+  Trash2,
+  Menu,
+  X,
+  RefreshCw,
+  LayoutTemplate,
+  Monitor,
+  Smartphone
+} from 'lucide-react';
+
+// --- Default Data & Configuration ---
+
+const DEFAULT_TEMPLATE = `Role (角色设定)
+你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图（Character Sheet）。你具备“像素级拆解”的能力，能够透视角色的穿着层级、捕捉微表情变化，并将与其相关的物品进行具象化还原。你特别擅长通过 {{subject}} 的私密物品、随身物件和生活细节来侧面丰满人物性格与背景故事。
+
+Task (任务目标)
+根据用户上传或描述的主体形象，生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情、核心道具、材质特写，以及极具生活气息的私密与随身物品展示。
+
+Visual Guidelines (视觉规范)
+1. 构图布局(Layout):
+•中心位(Center): 放置角色的 {{layout_focus}} ，作为视觉锚点。
+•环绕位(Surroundings): 在中心人物四周空白处，有序排列拆解后的元素。
+•视觉引导(Connectors): 使用 {{connectors}} ，将周边的拆解物品与中心人物的对应部位或所属区域连接起来。
+
+2. 拆解内容(Deconstruction Details):
+•服装分层(Clothing Layers): 将角色的服装拆分为单品展示，例如： {{clothing}}
+•私密内着拆解: 独立展示角色的内层衣物，重点突出设计感与材质。例如： {{underwear_style}} （展示细节与剪裁）。
+•表情集(Expression Sheet): 在角落绘制3-4 个不同的头部特写，展示不同的情绪，如： {{expressions}} 。
+•材质特写(Texture & Zoom): 选取关键部位进行放大特写。例如： {{texture_zoom}} ，增加对小物件材质的描绘。
+•动作: 绘制特殊的动作和表情，例如： {{action_detail}} ，增加动作的深度刻画。
+•特殊视角: 绘制从某种特殊场景下拍摄的特殊视角，例如： {{special_view}}
+•关联物品(Related Items):
+•随身包袋与内容物: 绘制 {{bag_content}} ，并将其“打开”，展示散落在旁的物品。
+•美妆与护理: 展示 {{cosmetics}} 。
+•私密生活物件: 具象化角色隐藏面的物品。根据角色性格可能包括： {{private_items}} ，需以一种设计图的客观视角呈现。
+
+3. 风格与注释(Style & Annotations):
+•画风: {{art_style}} ，线条干净利落。
+•背景: {{background_style}} ，营造设计手稿的氛围。
+•灯光: {{lighting}}
+`;
+
+const VARIABLE_GROUPS = {
+  character: {
+    label: "人物 (CHARACTER)",
+    keys: ["role", "subject", "character_companion", "expressions"],
+    icon: "User"
+  },
+  action: {
+    label: "动作 (ACTION)",
+    keys: ["grid_pose", "action_detail", "action_pose"],
+    icon: "Activity"
+  },
+  visuals: {
+    label: "画面 (VISUALS)",
+    keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"],
+    icon: "Image"
+  },
+  item: {
+    label: "物品 (ITEM)",
+    keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"],
+    icon: "Package"
+  },
+  location: {
+    label: "地点 (LOCATION)",
+    keys: ["background_scene"],
+    icon: "MapPin"
+  }
+};
+
+const DEFAULT_OPTIONS = {
+  role: ["游戏与动漫概念美术设计大师", "资深时尚摄影师", "电影分镜师"],
+  subject: ["女性角色", "赛博朋克黑客", "奇幻精灵游侠", "现代都市白领"],
+  layout_focus: ["全身立绘", "半身像", "特写镜头"],
+  connectors: ["手绘箭头或引导线", "虚线连接", "光效指引"],
+  clothing: ["机能风外套", "丝绸长裙", "战斗装甲"],
+  underwear_style: ["成套的蕾丝内衣裤", "运动内衣", "棉质简约款"],
+  expressions: ["疯狂、病娇、狂喜", "冷漠、轻蔑、无视", "羞涩、脸红、躲闪"],
+  texture_zoom: ["凌乱感与私处汗渍", "皮革纹理与磨损", "金属光泽与锈迹"],
+  action_detail: ["带着项圈的爬行", "拔剑战斗姿态", "优雅的下午茶时光"],
+  special_view: ["被踩在脚下的仰视视角", "上帝视角俯瞰", "鱼眼镜头特写"],
+  bag_content: ["日常通勤包或手拿包", "战术背包", "魔法药剂袋"],
+  cosmetics: ["常用的化妆品组合", "战地急救包", "魔法符文绘制工具"],
+  private_items: ["震动棒与项圈", "日记本与旧照片", "护身符与水晶"],
+  art_style: ["高质量的2D 插画风格", "吉卜力动画风格", "厚涂油画风格"],
+  background_style: ["漫画网格笔记本", "纯色极简背景", "赛博朋克霓虹街道"],
+  lighting: ["自然光", "赛博霓虹光", "伦勃朗光"],
+};
+
+// --- Components ---
+
+export default function PromptFill() {
+  const [templateContent, setTemplateContent] = useState(DEFAULT_TEMPLATE);
+  const [variableValues, setVariableValues] = useState({});
+  const [variableOptions, setVariableOptions] = useState(DEFAULT_OPTIONS);
+  const [mode, setMode] = useState('preview'); // 'preview' or 'edit'
+  const [activeTab, setActiveTab] = useState('fill'); // 'fill' or 'config'
+  
+  // Use a ref to track if sidebar was manually toggled, but default to closed on mobile on mount
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+
+  // Effect to handle desktop default open state
+  useEffect(() => {
+    if (window.innerWidth >= 1024) {
+      setIsSidebarOpen(true);
+    }
+  }, []);
+  
+  // Extract variables from template: {{variable_name}}
+  const variables = useMemo(() => {
+    const regex = /\{\{([^}]+)\}\}/g;
+    const found = new Set();
+    let match;
+    while ((match = regex.exec(templateContent)) !== null) {
+      found.add(match[1].trim());
+    }
+    return Array.from(found);
+  }, [templateContent]);
+
+  // Group variables for UI
+  const groupedVariables = useMemo(() => {
+    const groups = {
+      character: [],
+      action: [],
+      visuals: [],
+      item: [],
+      location: [],
+      other: []
+    };
+
+    variables.forEach(key => {
+      let found = false;
+      for (const [groupKey, config] of Object.entries(VARIABLE_GROUPS)) {
+        if (config.keys.includes(key)) {
+          groups[groupKey].push(key);
+          found = true;
+          break;
+        }
+      }
+      if (!found) groups.other.push(key);
+    });
+
+    return groups;
+  }, [variables]);
+
+  // Fill text logic
+  const generatedText = useMemo(() => {
+    let text = templateContent;
+    variables.forEach(key => {
+      const value = variableValues[key] || `{{${key}}}`;
+      // Global replace
+      text = text.split(`{{${key}}}`).join(value);
+    });
+    return text;
+  }, [templateContent, variableValues, variables]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(generatedText);
+    // Visual feedback could be added here
+  };
+
+  const resetValues = () => {
+    setVariableValues({});
+  };
+
+  return (
+    // Use h-[100dvh] for better mobile browser support (address bar handling)
+    <div className="flex h-[100dvh] w-full bg-gray-50 text-gray-800 font-sans overflow-hidden relative">
+      
+      {/* Mobile Overlay - Closes sidebar when clicked */}
+      {isSidebarOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/30 z-40 backdrop-blur-sm transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile Menu Toggle Button */}
+      <button 
+        className="lg:hidden fixed top-3 right-3 z-50 p-2.5 bg-white rounded-full shadow-lg border border-gray-100 active:scale-95 transition-transform"
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+      >
+        {isSidebarOpen ? <X size={20} className="text-gray-600" /> : <Menu size={20} className="text-gray-800" />}
+      </button>
+
+      {/* LEFT SIDEBAR - Configuration */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-[85%] sm:w-[400px] lg:w-[400px] bg-white border-r border-gray-200 shadow-2xl lg:shadow-none transform transition-transform duration-300 ease-out flex flex-col
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:relative lg:translate-x-0
+      `}>
+        {/* Header */}
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              提示词填空器 
+              <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded font-mono">V0.3.1</span>
+            </h1>
+            <p className="text-xs text-gray-400 mt-1 font-medium">Prompt Fill Tool</p>
+          </div>
+          {/* Desktop Close/Collapse could go here if needed */}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 shrink-0">
+          <button 
+            onClick={() => setActiveTab('fill')}
+            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'fill' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+          >
+            <Edit3 size={16} /> 填空模式
+          </button>
+          <button 
+            onClick={() => setActiveTab('config')}
+            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'config' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+          >
+            <Settings size={16} /> 词库配置
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar overscroll-contain pb-24">
+          
+          {activeTab === 'fill' ? (
+            /* --- FILL MODE --- */
+            <>
+              {Object.entries(groupedVariables).map(([groupKey, vars]) => {
+                if (vars.length === 0) return null;
+                const groupConfig = VARIABLE_GROUPS[groupKey];
+                const label = groupConfig ? groupConfig.label : "其他变量 (OTHER)";
+
+                return (
+                  <div key={groupKey} className="space-y-3 animate-in fade-in duration-500">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 sticky top-0 bg-white/95 backdrop-blur-sm py-2 z-10 border-b border-dashed border-gray-100">
+                      {groupConfig && <groupConfig.icon size={12} />}
+                      {label}
+                      <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full text-[10px] font-mono">{vars.length}</span>
+                    </h3>
+                    <div className="space-y-3 pl-1">
+                      {vars.map(key => (
+                        <VariableControl 
+                          key={key} 
+                          varKey={key} 
+                          value={variableValues[key] || ''} 
+                          options={variableOptions[key] || []}
+                          onChange={(val) => setVariableValues(prev => ({...prev, [key]: val}))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            /* --- CONFIG MODE --- */
+            <WordBankConfig 
+              variables={variables} 
+              options={variableOptions} 
+              setOptions={setVariableOptions} 
+            />
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50 shrink-0 safe-area-bottom">
+          <button 
+            onClick={resetValues}
+            className="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"
+          >
+            <RefreshCw size={16} /> 清空当前填写
+          </button>
+        </div>
+      </div>
+
+      {/* RIGHT MAIN PANEL - Preview */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-100/50 relative w-full">
+        
+        {/* Toolbar */}
+        <div className="h-16 px-4 lg:px-6 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm z-30 shrink-0">
+          <div className="flex items-center gap-2 lg:gap-4 overflow-x-auto no-scrollbar mask-gradient-right pr-4">
+             <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
+                <button 
+                  onClick={() => setMode('preview')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${mode === 'preview' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  <Eye size={14} /> <span className="hidden sm:inline">预览结果</span><span className="sm:hidden">预览</span>
+                </button>
+                <button 
+                  onClick={() => setMode('edit')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${mode === 'edit' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  <LayoutTemplate size={14} /> <span className="hidden sm:inline">编辑模版</span><span className="sm:hidden">编辑</span>
+                </button>
+             </div>
+          </div>
+          
+          <div className="flex items-center gap-2 pr-8 lg:pr-0">
+            <button 
+              onClick={handleCopy}
+              className="px-3 lg:px-4 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 active:scale-95 transition-all flex items-center gap-2 shadow-lg shadow-gray-200 whitespace-nowrap"
+            >
+              <Copy size={16} /> <span className="hidden sm:inline">一键复制</span><span className="sm:hidden">复制</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-3 lg:p-6 scroll-smooth">
+          <div className="max-w-4xl mx-auto bg-white min-h-[calc(100%-2rem)] shadow-sm border border-gray-200 rounded-xl overflow-hidden relative transition-all">
+            
+            {mode === 'preview' ? (
+              <div className="p-6 lg:p-12 whitespace-pre-wrap leading-relaxed text-gray-800 text-sm lg:text-base font-mono break-words">
+                <PreviewRenderer 
+                  text={templateContent} 
+                  variables={variables} 
+                  values={variableValues} 
+                />
+              </div>
+            ) : (
+              <textarea 
+                value={templateContent}
+                onChange={(e) => setTemplateContent(e.target.value)}
+                className="w-full h-full p-6 lg:p-12 bg-gray-50 text-gray-800 font-mono text-sm leading-relaxed focus:outline-none resize-none"
+                placeholder="输入你的 Prompt 模版，使用 {{variable}} 作为变量..."
+              />
+            )}
+            
+          </div>
+          <div className="h-20 lg:h-0"></div> {/* Bottom spacer for mobile fab clearance if needed */}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+// --- Sub-Components ---
+
+function PreviewRenderer({ text, variables, values }) {
+  if (!text) return null;
+
+  const pattern = new RegExp(`(\\{\\{(${variables.join('|')})\\}\\})`, 'g');
+  const parts = text.split(pattern);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (variables.includes(part)) {
+          const key = part;
+          const value = values[key];
+          const isFilled = value && value.length > 0;
+          
+          return (
+            <span 
+              key={index} 
+              className={`
+                inline-block px-1.5 py-0.5 mx-0.5 my-0.5 rounded border border-dashed transition-all duration-200 align-middle
+                ${isFilled 
+                  ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium' 
+                  : 'bg-yellow-50 border-yellow-300 text-yellow-600 font-normal text-xs lg:text-sm'}
+              `}
+            >
+              {isFilled ? value : `{{${key}}`}
+            </span>
+          );
+        }
+        if (part.startsWith('{{') && part.endsWith('}}')) return null;
+
+        return <span key={index}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+function VariableControl({ varKey, value, options, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside); // Added touch listener
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, []);
+
+  return (
+    <div className="relative group" ref={containerRef}>
+      <label className="block text-xs font-semibold text-gray-500 mb-1.5 ml-1 truncate">
+        {varKey}
+      </label>
+      <div className="relative">
+        <input 
+          type="text" 
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={`输入内容...`}
+          // 'text-base' on mobile prevents iOS zoom, 'md:text-sm' on desktop for compactness
+          className="w-full pl-3 pr-8 py-3 lg:py-2.5 bg-white border border-gray-200 rounded-xl lg:rounded-lg text-base lg:text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-gray-300 shadow-sm"
+          onFocus={() => setIsOpen(true)}
+        />
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 rounded-full active:bg-gray-100 touch-manipulation"
+        >
+          <ChevronDown size={16} className={`transform transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {/* Dropdown Options */}
+      {isOpen && options.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 custom-scrollbar">
+          <div className="p-1">
+            {options.map((opt, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  onChange(opt);
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-3 py-3 lg:py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition-colors truncate active:bg-blue-100"
+                title={opt}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WordBankConfig({ variables, options, setOptions }) {
+  const [selectedVar, setSelectedVar] = useState(variables[0] || '');
+  const [newOption, setNewOption] = useState('');
+
+  const currentOptions = options[selectedVar] || [];
+
+  const addOption = () => {
+    if (!newOption.trim()) return;
+    setOptions(prev => ({
+      ...prev,
+      [selectedVar]: [...(prev[selectedVar] || []), newOption.trim()]
+    }));
+    setNewOption('');
+  };
+
+  const removeOption = (idx) => {
+    setOptions(prev => ({
+      ...prev,
+      [selectedVar]: prev[selectedVar].filter((_, i) => i !== idx)
+    }));
+  };
+
+  if (!selectedVar && variables.length > 0) setSelectedVar(variables[0]);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+        <h3 className="text-sm font-semibold text-blue-900 mb-2">配置说明</h3>
+        <p className="text-xs text-blue-700 leading-relaxed">
+          在这里管理每个变量的候选项。添加的选项将在“填空模式”的下拉菜单中显示。
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">选择变量</label>
+        <div className="grid grid-cols-2 gap-2">
+          {variables.map(v => (
+            <button
+              key={v}
+              onClick={() => setSelectedVar(v)}
+              className={`text-xs px-3 py-2.5 rounded-lg border text-left truncate transition-colors ${
+                selectedVar === v 
+                  ? 'bg-gray-800 text-white border-gray-800 shadow-md' 
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 active:bg-gray-50'
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selectedVar && (
+        <div className="space-y-3 pt-4 border-t border-gray-100">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+               {selectedVar} 的选项 ({currentOptions.length})
+            </label>
+          </div>
+          
+          <div className="flex gap-2">
+            <input 
+              value={newOption}
+              onChange={(e) => setNewOption(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addOption()}
+              className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base lg:text-sm focus:outline-none focus:border-blue-500"
+              placeholder="添加新选项..."
+            />
+            <button 
+              onClick={addOption}
+              className="px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors active:scale-95"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+
+          <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+            {currentOptions.map((opt, idx) => (
+              <div key={idx} className="group flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-all">
+                <span className="text-sm text-gray-700">{opt}</span>
+                <button 
+                  onClick={() => removeOption(idx)}
+                  className="text-gray-300 hover:text-red-500 p-1 transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

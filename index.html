@@ -3,216 +3,214 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>咒语魔盒 (Prompt Fill Tool) V0.7.0</title>
+<title>咒语魔盒 (Prompt Fill Tool) V0.8.0</title>
 <style>
-    /* --- 核心主题变量 (复刻原站风格) --- */
+    /* --- 核心主题变量 --- */
     :root {
-        --primary: #4f46e5;       /* 靛蓝主色 */
-        --primary-light: #eef2ff; /* 浅靛蓝背景 */
+        --primary: #4f46e5;
         --text-main: #1f2937;
         --text-sub: #6b7280;
-        --bg-body: #f3f4f6;       /* 浅灰底色 */
+        --bg-body: #f3f4f6;
         --bg-white: #ffffff;
         --border: #e5e7eb;
-        --radius-lg: 16px;
-        --radius-md: 12px;
-        --radius-sm: 8px;
-        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --radius: 16px;
         --safe-bottom: env(safe-area-inset-bottom);
         
-        /* 分组色系 */
-        --color-char: #3b82f6; /* 蓝 */
-        --color-act: #ec4899;  /* 粉 */
-        --color-vis: #8b5cf6;  /* 紫 */
-        --color-item: #f59e0b; /* 橙 */
-        --color-loc: #10b981;  /* 绿 */
+        /* 变量分组色系 (参考截图) */
+        --c-char-bg: #dbeafe; --c-char-text: #1e40af; /* 人物-蓝 */
+        --c-act-bg: #fce7f3; --c-act-text: #db2777;  /* 动作-粉 */
+        --c-vis-bg: #f3e8ff; --c-vis-text: #7e22ce;  /* 画面-紫 */
+        --c-item-bg: #ffedd5; --c-item-text: #c2410c; /* 物品-橙 */
+        --c-loc-bg: #d1fae5; --c-loc-text: #047857;  /* 地点-绿 */
+        --c-other-bg: #f3f4f6; --c-other-text: #4b5563; /* 其他-灰 */
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif; background: var(--bg-body); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; background: var(--bg-body); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* --- 布局容器 --- */
+    /* --- 布局框架 --- */
     .app-viewport { flex: 1; overflow: hidden; position: relative; width: 100%; height: 100%; }
-    .tab-view { position: absolute; inset: 0; display: none; flex-direction: column; overflow-y: auto; overflow-x: hidden; background: var(--bg-body); padding-bottom: calc(60px + var(--safe-bottom)); scroll-behavior: smooth; }
+    .tab-view { position: absolute; inset: 0; display: none; flex-direction: column; background: var(--bg-body); padding-bottom: calc(60px + var(--safe-bottom)); }
     .tab-view.active { display: flex; animation: fadeIn 0.2s ease-out; }
+    .scroll-content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 16px; }
 
     /* --- 通用组件 --- */
-    /* 标题栏 */
-    .header-bar { padding: 16px 20px; background: var(--bg-white); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow-sm); flex-shrink: 0; }
-    .page-title { font-size: 20px; font-weight: 800; color: var(--text-main); letter-spacing: -0.5px; }
-    .page-subtitle { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+    .header-bar { padding: 12px 16px; background: var(--bg-white); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px rgba(0,0,0,0.05); z-index: 10; height: 56px; }
+    .page-title { font-size: 18px; font-weight: 800; color: var(--text-main); }
+    
+    .btn-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--text-sub); transition: 0.1s; background: transparent; border: none; }
+    .btn-icon:active { background: #f3f4f6; color: var(--text-main); transform: scale(0.95); }
+    .btn-icon.primary { background: #eef2ff; color: var(--primary); }
 
-    /* 按钮 */
-    .btn-float { position: fixed; bottom: calc(80px + var(--safe-bottom)); right: 20px; background: var(--primary); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); z-index: 20; transition: transform 0.1s; }
-    .btn-float:active { transform: scale(0.9); }
-    .btn-block { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: var(--radius-md); font-weight: 600; font-size: 14px; margin-top: 16px; }
-    .btn-icon { padding: 8px; color: var(--text-sub); border-radius: var(--radius-sm); }
-    .btn-icon:active { background: var(--bg-body); color: var(--text-main); }
+    /* --- Editor 交互式预览 (核心交互优化) --- */
+    .editor-card { background: var(--bg-white); border-radius: var(--radius); box-shadow: 0 4px 20px rgba(0,0,0,0.05); overflow: hidden; min-height: 80%; display: flex; flex-direction: column; }
+    
+    /* 图片占位区 (IMG_2947) */
+    .card-visual { height: 160px; background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%); display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 12px; font-weight: 600; letter-spacing: 1px; border-bottom: 1px solid #f3f4f6; }
+    
+    .card-content { padding: 24px 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.8; color: #374151; white-space: pre-wrap; flex: 1; }
+    
+    /* 交互式胶囊 (Chips) */
+    .interactive-chip { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 13px; font-weight: 600; margin: 2px 2px; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.05); user-select: none; }
+    .interactive-chip:active { transform: scale(0.95); opacity: 0.8; }
+    .interactive-chip.empty { border-style: dashed; background: #fff; color: #9ca3af; border-color: #d1d5db; padding: 2px 8px; }
 
-    /* 滚动条隐藏 */
-    ::-webkit-scrollbar { width: 0; height: 0; }
-
-    /* --- 模版管理 (Tab 1) --- */
-    .tpl-card { background: var(--bg-white); border-radius: var(--radius-lg); padding: 16px; margin: 12px 16px; box-shadow: var(--shadow-sm); border: 1px solid transparent; transition: all 0.2s; position: relative; overflow: hidden; }
-    .tpl-card:active { transform: scale(0.98); background: var(--primary-light); border-color: #c7d2fe; }
-    .tpl-card.active-tpl { border: 1px solid var(--primary); background: #eff6ff; }
-    .tpl-card.active-tpl::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
+    /* 分组颜色 */
+    .chip-char { background: var(--c-char-bg); color: var(--c-char-text); border-color: rgba(59, 130, 246, 0.2); }
+    .chip-act { background: var(--c-act-bg); color: var(--c-act-text); border-color: rgba(236, 72, 153, 0.2); }
+    .chip-vis { background: var(--c-vis-bg); color: var(--c-vis-text); border-color: rgba(139, 92, 246, 0.2); }
+    .chip-item { background: var(--c-item-bg); color: var(--c-item-text); border-color: rgba(245, 158, 11, 0.2); }
+    .chip-loc { background: var(--c-loc-bg); color: var(--c-loc-text); border-color: rgba(16, 185, 129, 0.2); }
     
-    .tpl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .tpl-title { font-size: 16px; font-weight: 700; color: var(--text-main); }
-    .tpl-tag { font-size: 10px; padding: 2px 6px; background: #e0e7ff; color: var(--primary); border-radius: 4px; font-weight: 600; }
-    .tpl-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    
-    .tpl-actions { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; display: flex; justify-content: flex-end; gap: 16px; }
-    .action-btn { font-size: 12px; color: var(--text-sub); display: flex; align-items: center; gap: 4px; }
-
-    /* --- 词库配置 (Tab 2) --- */
-    /* 仿照 IMG_2945 */
-    .config-section-title { padding: 16px 20px 8px; font-size: 12px; font-weight: 700; color: var(--text-sub); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-    .config-dot { width: 8px; height: 8px; border-radius: 50%; }
-    
-    .config-card { background: var(--bg-white); margin: 0 16px 12px; border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-sm); border: 1px solid white; transition: 0.2s; }
-    .config-card.expanded { border-color: var(--primary); }
-    
-    .config-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    .config-header:active { background: #f9fafb; }
-    .config-name { font-size: 15px; font-weight: 600; color: var(--text-main); }
-    .config-key { font-size: 11px; color: #9ca3af; font-family: monospace; background: #f3f4f6; padding: 2px 4px; border-radius: 4px; margin-top: 4px; display: inline-block; }
-    
-    .config-body { display: none; background: #f9fafb; border-top: 1px solid #f3f4f6; padding: 0 0 8px 0; }
-    .config-card.expanded .config-body { display: block; }
-    
-    .config-opt-item { padding: 10px 16px; border-bottom: 1px solid #eee; font-size: 14px; display: flex; justify-content: space-between; background: white; }
-    .config-add-box { margin: 8px 16px; display: flex; gap: 8px; }
-    .config-input { flex: 1; background: white; border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-size: 13px; }
-
-    /* --- Editor (Tab 3) --- */
-    /* 预览区 */
-    .preview-box { background: white; margin: 12px; padding: 16px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid #e0e7ff; max-height: 150px; overflow-y: auto; font-size: 13px; line-height: 1.6; color: #4b5563; position: relative; }
-    .preview-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
-    .preview-tag { position: absolute; top: 0; left: 0; background: #e0e7ff; color: var(--primary); font-size: 10px; padding: 2px 8px; border-bottom-right-radius: 8px; font-weight: bold; }
-    
-    .hl-text { color: var(--primary); background: rgba(99, 102, 241, 0.1); padding: 0 2px; border-radius: 2px; font-weight: 600; border-bottom: 1px dashed var(--primary); }
-
-    /* 输入组 */
-    .editor-section { margin-top: 20px; }
-    .editor-section-header { padding: 0 20px 8px; font-size: 12px; font-weight: 800; color: #9ca3af; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-    
-    .field-row { background: white; padding: 12px 16px; margin: 0 12px 10px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px; border-left: 3px solid transparent; transition: transform 0.1s; }
-    .field-row:active { transform: scale(0.99); }
-    
-    .field-top { display: flex; justify-content: space-between; align-items: center; }
-    .field-label { font-size: 14px; font-weight: 700; color: #374151; }
-    .field-key { font-size: 10px; color: #9ca3af; background: #f3f4f6; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
-    
-    .field-input-wrapper { display: flex; gap: 8px; align-items: center; }
-    .field-input { flex: 1; border: none; background: #f9fafb; padding: 10px; border-radius: 8px; font-size: 14px; color: var(--text-main); }
-    .field-input:focus { background: white; box-shadow: 0 0 0 2px var(--primary-light); }
-    
-    .btn-select { width: 36px; height: 36px; background: #e0e7ff; color: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-
-    /* --- 底部弹窗 (Bottom Sheet) --- */
-    .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; display: flex; flex-direction: column; justify-content: flex-end; backdrop-filter: blur(2px); }
+    /* --- 底部选词面板 (IMG_2948) --- */
+    .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; display: flex; flex-direction: column; justify-content: flex-end; backdrop-filter: blur(4px); }
     .sheet-overlay.open { opacity: 1; pointer-events: auto; }
     
-    .sheet-content { background: white; width: 100%; max-height: 70vh; border-radius: 20px 20px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; overflow: hidden; }
-    .sheet-overlay.open .sheet-content { transform: translateY(0); }
+    .sheet-container { background: var(--bg-white); width: 100%; max-height: 75vh; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 -10px 40px rgba(0,0,0,0.1); }
+    .sheet-overlay.open .sheet-container { transform: translateY(0); }
     
-    .sheet-header { padding: 16px 20px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
-    .sheet-title { font-size: 16px; font-weight: 700; color: var(--text-main); }
-    .sheet-body { overflow-y: auto; padding: 0; flex: 1; background: #f9fafb; }
+    .sheet-header { padding: 16px 20px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; background: #fff; }
+    .sheet-title-row { display: flex; align-items: center; gap: 8px; }
+    .sheet-label { font-size: 16px; font-weight: 700; color: var(--text-main); }
+    .sheet-tag { font-size: 10px; font-weight: 700; color: #fff; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
     
-    .sheet-opt { padding: 14px 20px; background: white; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #4b5563; transition: 0.1s; display: flex; justify-content: space-between; align-items: center; }
-    .sheet-opt:active { background: #eef2ff; color: var(--primary); }
-    .sheet-opt.selected { color: var(--primary); font-weight: 600; background: #eef2ff; }
+    .sheet-body { overflow-y: auto; padding: 8px 0; flex: 1; background: #fff; }
+    .sheet-opt { padding: 14px 24px; font-size: 15px; color: #4b5563; display: flex; justify-content: space-between; align-items: center; transition: 0.1s; cursor: pointer; }
+    .sheet-opt:active { background: #f9fafb; }
+    .sheet-opt.selected { color: var(--primary); font-weight: 600; background: #f5f7ff; }
+    .sheet-opt-check { opacity: 0; transform: scale(0.8); transition: all 0.2s; color: var(--primary); }
+    .sheet-opt.selected .sheet-opt-check { opacity: 1; transform: scale(1); }
     
-    .sheet-add-btn { padding: 16px; text-align: center; color: var(--primary); font-weight: 600; font-size: 14px; background: white; margin-top: 1px; border-top: 1px solid #eee; }
+    .sheet-footer { padding: 12px 20px calc(12px + var(--safe-bottom)); border-top: 1px solid #f3f4f6; background: #fff; }
+    .btn-add-custom { width: 100%; padding: 12px; border: 1px dashed #d1d5db; border-radius: 10px; color: var(--text-sub); font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; background: transparent; }
+    .btn-add-custom:active { background: #f9fafb; border-color: var(--text-sub); color: var(--text-main); }
+
+    /* --- 模版列表 --- */
+    .tpl-item { background: #fff; padding: 16px; margin-bottom: 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid transparent; transition: 0.1s; }
+    .tpl-item:active { transform: scale(0.98); background: #f9fafb; }
+    .tpl-item.active { border-color: var(--primary); background: #eff6ff; }
+    .tpl-icon { width: 40px; height: 40px; background: #f3f4f6; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .tpl-info { flex: 1; min-width: 0; }
+    .tpl-name { font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
+    .tpl-prev { font-size: 12px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* --- 词库配置 --- */
+    .conf-group { margin-bottom: 20px; }
+    .conf-title { padding: 0 8px 8px; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px; }
+    .conf-list { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
+    .conf-row { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+    .conf-row:last-child { border-bottom: none; }
+    .conf-key { font-family: monospace; font-size: 11px; color: #9ca3af; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
 
     /* --- 底部导航 --- */
-    .bottom-nav { height: calc(60px + var(--safe-bottom)); background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-top: 1px solid #e5e7eb; position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; align-items: center; padding-bottom: var(--safe-bottom); z-index: 50; }
-    .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9ca3af; font-size: 10px; font-weight: 500; width: 100%; height: 100%; justify-content: center; }
+    .bottom-nav { height: calc(56px + var(--safe-bottom)); background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-top: 1px solid #e5e7eb; position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; padding-bottom: var(--safe-bottom); z-index: 50; }
+    .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #9ca3af; font-size: 10px; font-weight: 500; height: 100%; transition: 0.1s; }
     .nav-btn.active { color: var(--primary); }
-    .nav-btn svg { width: 24px; height: 24px; transition: transform 0.2s; }
-    .nav-btn.active svg { transform: translateY(-2px); fill: rgba(79, 70, 229, 0.1); }
+    .nav-btn svg { width: 22px; height: 22px; transition: transform 0.2s; }
+    .nav-btn.active svg { transform: translateY(-2px); }
+
+    /* 浮动按钮 */
+    .fab { position: fixed; bottom: calc(70px + var(--safe-bottom)); right: 20px; width: 50px; height: 50px; border-radius: 25px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(79,70,229,0.3); z-index: 40; transition: transform 0.2s; }
+    .fab:active { transform: scale(0.9); }
 
     /* 动画 */
-    @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 </style>
+<!-- HTML2Canvas -->
+<script src="https://cdn.staticfile.net/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
 <div class="app-viewport">
 
-    <!-- 1. 模版管理 (Templates) -->
+    <!-- TAB 1: 模版管理 -->
     <div id="tab-templates" class="tab-view active">
         <div class="header-bar">
             <div class="page-title">模版管理</div>
-            <div class="page-subtitle">选择或管理你的 Prompt 模版</div>
+            <div style="font-size:12px;color:#999;">V0.8.0</div>
         </div>
-        <div id="tpl-list-container" style="padding-bottom: 20px;">
-            <!-- 模版列表 -->
+        <div id="tpl-list" class="scroll-content">
+            <!-- JS 生成 -->
         </div>
-        <!-- 浮动新建按钮 -->
-        <div class="btn-float" onclick="createNewTemplate()">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <div class="fab" onclick="createNewTemplate()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </div>
     </div>
 
-    <!-- 2. Editor (填空) -->
+    <!-- TAB 2: Editor (交互式填空) -->
     <div id="tab-editor" class="tab-view">
-        <div class="header-bar" style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <div class="page-title" id="editor-page-title" style="font-size:16px;">未选择模版</div>
+        <div class="header-bar" style="border-bottom:1px solid #f3f4f6;">
+            <div class="page-title" id="editor-title" style="font-size:16px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">未选择模版</div>
+            <div style="display:flex;gap:4px;">
+                <button class="btn-icon" onclick="switchMode()" title="切换源码模式">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </button>
+                <button class="btn-icon" onclick="exportImage()" title="保存图片">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </button>
+                <button class="btn-icon primary" onclick="copyResult()" title="复制结果">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
             </div>
-            <button onclick="copyResult()" style="font-size:12px; font-weight:700; color:var(--primary); padding:6px 12px; background:#eef2ff; border-radius:20px;">复制结果</button>
-        </div>
-        
-        <!-- 预览区 -->
-        <div class="preview-box">
-            <div class="preview-tag">PREVIEW</div>
-            <div id="preview-text"></div>
         </div>
 
-        <!-- 输入表单 -->
-        <div id="editor-form-container">
-            <!-- 动态生成 -->
+        <div class="scroll-content" style="background: #f3f4f6; padding: 12px;">
+            <!-- 填空模式 (交互式卡片) -->
+            <div id="editor-fill-mode" class="editor-card">
+                <div class="card-visual">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(79,70,229,0.3)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </div>
+                <div id="editor-interactive-area" class="card-content">
+                    <!-- 动态生成的内容 -->
+                </div>
+            </div>
+
+            <!-- 源码模式 -->
+            <div id="editor-code-mode" style="display:none; height:100%; flex-direction:column; gap:10px;">
+                <input id="code-title" placeholder="模版标题" style="padding:12px;border:1px solid #ddd;border-radius:10px;">
+                <textarea id="code-content" style="flex:1;padding:12px;border:1px solid #ddd;border-radius:10px;resize:none;font-family:monospace;line-height:1.5;" placeholder="输入 Prompt..."></textarea>
+            </div>
         </div>
-        <div style="height: 20px;"></div>
     </div>
 
-    <!-- 3. 词库配置 (Config) -->
+    <!-- TAB 3: 词库配置 -->
     <div id="tab-config" class="tab-view">
         <div class="header-bar">
             <div class="page-title">词库配置</div>
-            <div class="page-subtitle">所有模版共享同一套词库数据</div>
         </div>
-        <div id="config-list-container" style="padding-top: 12px;">
-            <!-- 配置列表 -->
+        <div id="config-list" class="scroll-content">
+            <!-- JS 生成 -->
         </div>
     </div>
 
 </div>
 
-<!-- 底部弹窗选择器 (Bottom Sheet) -->
+<!-- 底部选词面板 (Bottom Sheet) -->
 <div id="bottom-sheet" class="sheet-overlay" onclick="closeSheet(event)">
-    <div class="sheet-content" onclick="event.stopPropagation()">
+    <div class="sheet-container" onclick="event.stopPropagation()">
         <div class="sheet-header">
-            <div class="sheet-title" id="sheet-title">选择选项</div>
-            <button onclick="closeSheet()" style="padding:4px;color:#999;">✕</button>
+            <div class="sheet-title-row">
+                <span class="sheet-label" id="sheet-label">选择选项</span>
+                <span class="sheet-tag" id="sheet-group-tag" style="background:#999;">GROUP</span>
+            </div>
+            <button onclick="closeSheet()" style="padding:8px;margin:-8px;color:#999;border:none;background:none;font-size:20px;">×</button>
         </div>
-        <div class="sheet-body" id="sheet-list">
-            <!-- 选项 -->
+        <div class="sheet-body" id="sheet-options">
+            <!-- 选项列表 -->
         </div>
-        <div class="sheet-add-btn" onclick="addCustomOption()">+ 添加自定义选项</div>
+        <div class="sheet-footer">
+            <button class="btn-add-custom" onclick="addCustomOption()">
+                <span>+</span> 添加自定义选项
+            </button>
+        </div>
     </div>
 </div>
 
-<!-- 底部导航 -->
+<!-- 底部导航栏 -->
 <div class="bottom-nav">
     <div class="nav-btn active" onclick="switchTab('templates')" id="nav-templates">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-        <span>模版管理</span>
+        <span>模版</span>
     </div>
     <div class="nav-btn" onclick="switchTab('editor')" id="nav-editor">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -220,12 +218,12 @@
     </div>
     <div class="nav-btn" onclick="switchTab('config')" id="nav-config">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        <span>词库配置</span>
+        <span>词库</span>
     </div>
 </div>
 
 <script>
-// --- 数据预设 (完全同步原站) ---
+// --- 1. 数据配置 (全量同步) ---
 const VAR_MAP = {
     role: "角色身份", subject: "主体对象", character_companion: "合影角色", expressions: "表情集",
     grid_pose: "九宫格动作", action_detail: "动作细节", action_pose: "互动姿势",
@@ -238,17 +236,17 @@ const VAR_MAP = {
 };
 
 const VAR_GROUPS = {
-    character: { label: "人物 (CHARACTER)", keys: ["role", "subject", "character_companion", "expressions"], color: "#3b82f6" },
-    action: { label: "动作 (ACTION)", keys: ["grid_pose", "action_detail", "action_pose"], color: "#ec4899" },
-    visuals: { label: "画面 (VISUALS)", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"], color: "#8b5cf6" },
-    item: { label: "物品 (ITEM)", keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"], color: "#f59e0b" },
-    location: { label: "地点 (LOCATION)", keys: ["background_scene"], color: "#10b981" }
+    character: { label: "人物 (CHARACTER)", keys: ["role", "subject", "character_companion", "expressions"], color: "#3b82f6", bg: "#dbeafe", text: "#1e40af" },
+    action: { label: "动作 (ACTION)", keys: ["grid_pose", "action_detail", "action_pose"], color: "#ec4899", bg: "#fce7f3", text: "#db2777" },
+    visuals: { label: "画面 (VISUALS)", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"], color: "#8b5cf6", bg: "#f3e8ff", text: "#7e22ce" },
+    item: { label: "物品 (ITEM)", keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"], color: "#f59e0b", bg: "#ffedd5", text: "#c2410c" },
+    location: { label: "地点 (LOCATION)", keys: ["background_scene"], color: "#10b981", bg: "#d1fae5", text: "#047857" }
 };
 
 const DEFAULT_OPTIONS = {
     role: ["游戏与动漫概念美术设计大师", "资深时尚摄影师", "电影分镜师", "人设画师"],
     subject: ["女性角色", "赛博朋克黑客", "奇幻精灵游侠", "现代都市白领", "机甲驾驶员", "克苏鲁修女"],
-    character_companion: ["一只肥猫", "童年的自己", "宿敌", "全息投影AI", "死侍", "超人", "爱因斯坦"],
+    character_companion: ["一只肥猫", "童年的自己", "宿敌", "全息投影AI", "死侍", "超人"],
     expressions: ["疯狂、病娇、狂喜", "冷漠、轻蔑、无视", "羞涩、脸红、躲闪", "自信、张扬、大笑"],
     grid_pose: ["站立、坐姿、动态跑跳", "战斗姿态展示", "日常休闲动作", "施法动作分解"],
     action_detail: ["带着项圈的爬行", "拔剑战斗姿态", "优雅的下午茶时光", "整理领带", "擦拭眼镜"],
@@ -289,213 +287,224 @@ const DEFAULT_TEMPLATES = [
     { id: 't4', title: '人物趣味合影', content: `Character Selfie (人物趣味合影)\n\n让 {{character_companion}} 站在 {{subject}} 旁边，\n\n{{action_pose}} ，同时对着镜头露出 {{expressions}} 的表情。\n\n背景：以 {{background_scene}} 为背景。\n\n要求：保持自拍构图不变，让两个角色自然地融入画面，光影统一，互动自然。` }
 ];
 
-// --- 状态与存储 ---
+// --- 2. 状态管理 ---
 let state = {
-    templates: JSON.parse(localStorage.getItem('pf_v7_tpl')) || DEFAULT_TEMPLATES,
-    options: JSON.parse(localStorage.getItem('pf_v7_opt')) || DEFAULT_OPTIONS,
-    activeId: localStorage.getItem('pf_v7_id') || 't1',
-    values: JSON.parse(localStorage.getItem('pf_v7_val')) || {},
-    tab: 'templates', 
+    templates: JSON.parse(localStorage.getItem('pf_v8_tpl')) || DEFAULT_TEMPLATES,
+    options: JSON.parse(localStorage.getItem('pf_v8_opt')) || DEFAULT_OPTIONS,
+    activeId: localStorage.getItem('pf_v8_id') || 't1',
+    values: JSON.parse(localStorage.getItem('pf_v8_val')) || {},
+    tab: 'templates',
+    mode: 'fill',
     currentVar: null
 };
 
+// --- 3. 核心功能 ---
 function save() {
-    localStorage.setItem('pf_v7_tpl', JSON.stringify(state.templates));
-    localStorage.setItem('pf_v7_opt', JSON.stringify(state.options));
-    localStorage.setItem('pf_v7_id', state.activeId);
-    localStorage.setItem('pf_v7_val', JSON.stringify(state.values));
+    localStorage.setItem('pf_v8_tpl', JSON.stringify(state.templates));
+    localStorage.setItem('pf_v8_opt', JSON.stringify(state.options));
+    localStorage.setItem('pf_v8_id', state.activeId);
+    localStorage.setItem('pf_v8_val', JSON.stringify(state.values));
     render();
 }
 
 function getActiveTpl() { return state.templates.find(t => t.id === state.activeId) || state.templates[0]; }
-function getVars(content) {
-    const regex = /\{\{([^}]+)\}\}/g, found = new Set();
-    let m; while ((m = regex.exec(content)) !== null) found.add(m[1].trim());
-    return Array.from(found);
+
+function getVarGroup(key) {
+    for (const [k, cfg] of Object.entries(VAR_GROUPS)) {
+        if (cfg.keys.includes(key)) return { ...cfg, id: k };
+    }
+    return { label: '其他', color: '#9ca3af', bg: '#f3f4f6', text: '#4b5563', id: 'other' };
 }
-function genText() {
+
+// 核心：生成交互式HTML
+function genInteractiveHtml() {
+    const tpl = getActiveTpl();
+    if (!tpl) return "";
+    let html = tpl.content;
+    const parts = html.split(/(\{\{[^}]+\}\})/g);
+    
+    return parts.map(part => {
+        if (part.startsWith('{{') && part.endsWith('}}')) {
+            const key = part.slice(2, -2).trim();
+            const val = state.values[key];
+            const group = getVarGroup(key);
+            const label = VAR_MAP[key] || key;
+            const cls = val ? `chip-${group.id}` : 'empty';
+            const display = val || label;
+            
+            return `<span class="interactive-chip ${cls}" onclick="openSheet('${key}')">${display}</span>`;
+        }
+        return `<span>${part}</span>`; // 普通文本
+    }).join('');
+}
+
+function genPlainText() {
     let txt = getActiveTpl().content;
-    getVars(txt).forEach(v => txt = txt.split(`{{${v}}}`).join(state.values[v] || `{{${v}}`));
+    const regex = /\{\{([^}]+)\}\}/g;
+    let m;
+    const vars = new Set();
+    while((m = regex.exec(txt)) !== null) vars.add(m[1].trim());
+    
+    vars.forEach(v => {
+        txt = txt.split(`{{${v}}}`).join(state.values[v] || `{{${v}}`);
+    });
     return txt;
 }
 
-// --- 渲染逻辑 ---
+// --- 4. 渲染逻辑 ---
 function render() {
-    // 1. Tab 切换
+    // Tab 切换
     document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
     document.getElementById(`tab-${state.tab}`).classList.add('active');
     
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(`nav-${state.tab}`).classList.add('active');
 
-    // 2. 模版列表渲染
-    document.getElementById('tpl-list-container').innerHTML = state.templates.map(t => `
-        <div class="tpl-card ${t.id === state.activeId ? 'active-tpl' : ''}" onclick="selectTemplate('${t.id}')">
-            <div class="tpl-header">
-                <div class="tpl-title">${t.title}</div>
-                <div class="tpl-tag">PROMPT</div>
+    // Tab 1: 模版列表
+    document.getElementById('tpl-list').innerHTML = state.templates.map(t => `
+        <div class="tpl-item ${t.id === state.activeId ? 'active' : ''}" onclick="selectTemplate('${t.id}')">
+            <div class="tpl-icon">📄</div>
+            <div class="tpl-info">
+                <div class="tpl-name">${t.title}</div>
+                <div class="tpl-prev">${t.content.substring(0,25)}...</div>
             </div>
-            <div class="tpl-desc">${t.content}</div>
-            <div class="tpl-actions">
-                <div class="action-btn" onclick="copyTpl('${t.id}', event)">复制</div>
-                <div class="action-btn" style="color:#ef4444" onclick="delTpl('${t.id}', event)">删除</div>
-            </div>
+            ${t.id === state.activeId ? '<div>✓</div>' : ''}
         </div>
     `).join('');
 
-    // 3. Editor 渲染
+    // Tab 2: Editor
     const tpl = getActiveTpl();
-    document.getElementById('editor-page-title').innerText = tpl.title;
+    document.getElementById('editor-title').innerText = tpl.title;
     
-    const vars = getVars(tpl.content);
-    // 分组逻辑
+    if (state.mode === 'fill') {
+        document.getElementById('editor-fill-mode').style.display = 'flex';
+        document.getElementById('editor-code-mode').style.display = 'none';
+        document.getElementById('editor-interactive-area').innerHTML = genInteractiveHtml();
+    } else {
+        document.getElementById('editor-fill-mode').style.display = 'none';
+        document.getElementById('editor-code-mode').style.display = 'flex';
+        document.getElementById('code-title').value = tpl.title;
+        document.getElementById('code-content').value = tpl.content;
+    }
+
+    // Tab 3: Config (分组展示)
+    const allVars = Object.keys(state.options);
     const groups = { other: [] };
     Object.keys(VAR_GROUPS).forEach(k => groups[k] = []);
-    vars.forEach(v => {
+    
+    allVars.forEach(v => {
         let matched = false;
-        for (const [k, cfg] of Object.entries(VAR_GROUPS)) { if (cfg.keys.includes(v)) { groups[k].push(v); matched=true; break; } }
+        for (const [k, cfg] of Object.entries(VAR_GROUPS)) { if(cfg.keys.includes(v)) { groups[k].push(v); matched=true; break; } }
         if (!matched) groups.other.push(v);
     });
 
-    let formHtml = '';
+    let confHtml = '';
     Object.entries(groups).forEach(([k, list]) => {
         if (list.length === 0) return;
-        const cfg = VAR_GROUPS[k] || {label: '其他变量', color: '#999'};
-        formHtml += `<div class="editor-section">
-            <div class="editor-section-header" style="color:${cfg.color}">
-                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cfg.color}"></span>
-                ${cfg.label}
-            </div>`;
+        const cfg = VAR_GROUPS[k] || {label: '其他变量'};
+        confHtml += `<div class="conf-group"><div class="conf-title">${cfg.label}</div><div class="conf-list">`;
         list.forEach(v => {
             const label = VAR_MAP[v] || v;
-            const val = state.values[v] || '';
-            formHtml += `
-                <div class="field-row" style="border-left-color:${cfg.color}">
-                    <div class="field-top">
-                        <div class="field-label">${label}</div>
-                        <div class="field-key">{{${v}}}</div>
-                    </div>
-                    <div class="field-input-wrapper">
-                        <input class="field-input" value="${val}" oninput="updateVal('${v}', this.value)" placeholder="请输入...">
-                        <div class="btn-select" onclick="openSheet('${v}')">☰</div>
-                    </div>
-                </div>`;
+            const count = (state.options[v]||[]).length;
+            confHtml += `<div class="conf-row" onclick="openSheet('${v}')">
+                <div><span>${label}</span><span class="conf-key">{{${v}}}</span></div>
+                <div style="color:#9ca3af;font-size:12px;">${count} ></div>
+            </div>`;
         });
-        formHtml += `</div>`;
+        confHtml += `</div></div>`;
     });
-    document.getElementById('editor-form-container').innerHTML = formHtml || '<div style="padding:40px;text-align:center;color:#999">当前模版无变量</div>';
-    
-    // 预览更新
-    const previewHtml = tpl.content.split(/(\{\{[^}]+\}\})/g).map(p => {
-        if (p.startsWith('{{') && p.endsWith('}}')) {
-            const k = p.slice(2, -2).trim();
-            const val = state.values[k];
-            return `<span class="hl-text" style="${val?'color:var(--primary);background:#eef2ff':'color:#f59e0b;background:#fffbeb;border-style:dashed'}">${val || k}</span>`;
-        }
-        return p;
-    }).join('');
-    document.getElementById('preview-text').innerHTML = previewHtml;
-
-    // 4. Config 渲染 (类似 Editor 结构)
-    let configHtml = '';
-    Object.entries(VAR_GROUPS).forEach(([k, cfg]) => {
-        // 查找属于该组的所有 key
-        const keysInGroup = cfg.keys.filter(k => state.options[k]);
-        if(keysInGroup.length === 0) return;
-        
-        configHtml += `<div class="config-section-title" style="color:${cfg.color}"><div class="config-dot" style="background:${cfg.color}"></div>${cfg.label}</div>`;
-        keysInGroup.forEach(v => {
-            const opts = state.options[v] || [];
-            const label = VAR_MAP[v] || v;
-            configHtml += `
-                <div class="config-card" id="conf-card-${v}">
-                    <div class="config-header" onclick="document.getElementById('conf-card-${v}').classList.toggle('expanded')">
-                        <div>
-                            <div class="config-name">${label}</div>
-                            <div class="config-key">{{${v}}}</div>
-                        </div>
-                        <div style="font-size:12px;color:#9ca3af">${opts.length} ></div>
-                    </div>
-                    <div class="config-body">
-                        ${opts.map((o,i) => `<div class="config-opt-item"><span>${o}</span><span style="color:#ef4444;font-weight:bold" onclick="delOpt('${v}',${i})">×</span></div>`).join('')}
-                        <div class="config-add-box">
-                            <input class="config-input" id="add-inp-${v}" placeholder="新增...">
-                            <button onclick="addOpt('${v}')" style="color:var(--primary);font-weight:bold;padding:0 8px;">+</button>
-                        </div>
-                    </div>
-                </div>`;
-        });
-    });
-    document.getElementById('config-list-container').innerHTML = configHtml;
+    document.getElementById('config-list').innerHTML = confHtml;
 }
 
-// --- 交互动作 ---
+// --- 5. 交互动作 ---
 window.switchTab = (t) => { state.tab = t; save(); }
-window.selectTemplate = (id) => { state.activeId = id; state.tab = 'editor'; save(); }
-window.updateVal = (k, v) => { state.values[k] = v; save(); }
-
-// 模版操作
-window.createNewTemplate = () => {
-    const id = 't' + Date.now();
-    state.templates.push({id, title:'新模版', content:'输入内容 {{变量}} ...'});
-    state.activeId = id; state.tab = 'editor'; save();
-}
-window.copyTpl = (id, e) => {
-    e.stopPropagation();
-    const t = state.templates.find(x => x.id === id);
-    state.templates.push({...t, id: 't'+Date.now(), title: t.title+'(副本)'});
-    save();
-}
-window.delTpl = (id, e) => {
-    e.stopPropagation();
-    if(state.templates.length <= 1) return alert('至少保留一个');
-    if(confirm('删除?')) {
-        state.templates = state.templates.filter(x => x.id !== id);
-        state.activeId = state.templates[0].id; save();
-    }
+window.selectTemplate = (id) => { 
+    state.activeId = id; 
+    state.tab = 'editor'; 
+    // 震动反馈 (如果设备支持)
+    if(navigator.vibrate) navigator.vibrate(10);
+    save(); 
 }
 
-// 底部弹窗
+window.switchMode = () => { 
+    state.mode = state.mode === 'fill' ? 'code' : 'fill'; 
+    save(); 
+}
+
+// 底部弹窗逻辑 (Sheet)
 window.openSheet = (key) => {
     state.currentVar = key;
+    const group = getVarGroup(key);
     const label = VAR_MAP[key] || key;
-    document.getElementById('sheet-title').innerText = `选择 ${label}`;
+    
+    document.getElementById('sheet-label').innerText = `选择 ${label}`;
+    const tag = document.getElementById('sheet-group-tag');
+    tag.innerText = group.label.split(' ')[0]; // 只显示中文部分
+    tag.style.background = group.color;
+    
     const opts = state.options[key] || [];
-    document.getElementById('sheet-list').innerHTML = opts.map(o => 
-        `<div class="sheet-opt ${state.values[key]===o ? 'selected' : ''}" onclick="selectSheetOpt('${o}')">${o} ${state.values[key]===o ? '✓' : ''}</div>`
-    ).join('');
+    const currentVal = state.values[key];
+    
+    document.getElementById('sheet-options').innerHTML = opts.map(o => `
+        <div class="sheet-opt ${o === currentVal ? 'selected' : ''}" onclick="selectOption('${o}')">
+            <span>${o}</span>
+            <span class="sheet-opt-check">✓</span>
+        </div>
+    `).join('') || '<div style="padding:20px;text-align:center;color:#ccc;">暂无选项</div>';
+    
     document.getElementById('bottom-sheet').classList.add('open');
 }
+
 window.closeSheet = (e) => {
     if(e && e.target !== document.getElementById('bottom-sheet') && !e.target.closest('button')) return;
     document.getElementById('bottom-sheet').classList.remove('open');
 }
-window.selectSheetOpt = (val) => {
-    updateVal(state.currentVar, val);
+
+window.selectOption = (val) => {
+    state.values[state.currentVar] = val;
+    save();
     document.getElementById('bottom-sheet').classList.remove('open');
 }
+
 window.addCustomOption = () => {
-    const val = prompt("输入新选项:");
+    const val = prompt("输入新选项内容:");
     if(val && val.trim()) {
-        if(!state.options[state.currentVar]) state.options[state.currentVar]=[];
-        state.options[state.currentVar].push(val.trim());
-        updateVal(state.currentVar, val.trim());
+        const key = state.currentVar;
+        if(!state.options[key]) state.options[key] = [];
+        state.options[key].push(val.trim());
+        state.values[key] = val.trim(); // 自动选中
         save();
         document.getElementById('bottom-sheet').classList.remove('open');
     }
 }
 
-// Config 操作
-window.addOpt = (v) => {
-    const inp = document.getElementById(`add-inp-${v}`);
-    if(inp.value.trim()) {
-        state.options[v].push(inp.value.trim());
-        inp.value=''; save();
-    }
+// 模版新建
+window.createNewTemplate = () => {
+    const id = 't'+Date.now();
+    state.templates.push({id, title:'新模版', content:'输入内容 {{变量}}...'});
+    state.activeId = id; state.tab = 'editor'; state.mode = 'code';
+    save();
 }
-window.delOpt = (v, i) => { state.options[v].splice(i, 1); save(); }
 
-window.copyResult = () => navigator.clipboard.writeText(genText()).then(() => alert('已复制'));
+// 源码编辑监听
+document.getElementById('code-title').addEventListener('input', e => {
+    getActiveTpl().title = e.target.value;
+    // 不立即 save 避免频繁重绘，可以用 debounce，这里简化
+});
+document.getElementById('code-content').addEventListener('input', e => {
+    getActiveTpl().content = e.target.value;
+});
+// 失去焦点时保存
+document.getElementById('code-content').addEventListener('blur', save);
+document.getElementById('code-title').addEventListener('blur', save);
+
+window.copyResult = () => navigator.clipboard.writeText(genPlainText()).then(()=>alert('已复制'));
+window.exportImage = () => {
+    html2canvas(document.getElementById('editor-fill-mode')).then(c => {
+        const a = document.createElement('a');
+        a.download = 'prompt.png'; a.href = c.toDataURL(); a.click();
+    });
+}
 
 // Init
 render();

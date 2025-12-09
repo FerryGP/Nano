@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>提示词填空器 (Prompt Fill Tool) V0.5.0</title>
+<title>咒语魔盒 (Prompt Fill Tool) V0.5.2</title>
 <style>
-    /* --- 核心样式 (原生 CSS 替代 Tailwind) --- */
+    /* --- 核心样式 --- */
     :root {
         --primary: #4f46e5;
         --primary-bg: #eef2ff;
@@ -14,7 +14,7 @@
         --text-sub: #6b7280;
         --bg-body: #f9fafb;
         --bg-white: #ffffff;
-        --shadow: 0 1px 3px rgba(0,0,0,0.1);
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         --radius: 12px;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -49,12 +49,13 @@
     .scroll-y::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
 
     /* 模版列表 */
-    .template-item { padding: 12px; margin: 8px 12px; border: 1px solid transparent; border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 10px; }
+    .template-item { padding: 12px; margin: 8px 12px; border: 1px solid transparent; border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
     .template-item:hover { background: #f9fafb; border-color: var(--border); }
-    .template-item.active { background: var(--primary-bg); border-color: #c7d2fe; }
-    .template-indicator { width: 4px; height: 24px; border-radius: 4px; background: #e5e7eb; transition: 0.2s; }
-    .template-item.active .template-indicator { background: var(--primary); }
-    .template-title { font-size: 14px; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .template-item.active { background: var(--primary-bg); border-color: #c7d2fe; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.05); }
+    .template-icon { width: 32px; height: 32px; background: #e0e7ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 14px; font-weight: bold; flex-shrink: 0; }
+    .template-info { flex: 1; min-width: 0; }
+    .template-title { font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .template-desc { font-size: 11px; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* 填空区域 */
     .split-view { display: flex; height: 100%; }
@@ -64,14 +65,15 @@
 
     /* 输入卡片 */
     .var-group { margin-bottom: 24px; animation: slideIn 0.3s ease; }
-    .var-group-title { font-size: 12px; font-weight: 700; color: #9ca3af; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; }
-    .var-input-card { background: white; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; position: relative; display: flex; flex-direction: column; transition: 0.2s; }
-    .var-input-card:focus-within { border-color: var(--primary); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1); transform: translateY(-1px); }
-    .var-label { font-size: 10px; color: #9ca3af; font-weight: 700; margin-bottom: 4px; }
-    .var-input { border: none; outline: none; font-size: 14px; width: 100%; color: var(--text-main); background: transparent; }
-    .var-select-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #9ca3af; padding: 4px; }
-    .dropdown-menu { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); display: none; }
-    .dropdown-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .var-group-title { font-size: 11px; font-weight: 800; color: #9ca3af; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .var-input-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; position: relative; display: flex; flex-direction: column; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+    .var-input-card:focus-within { border-color: var(--primary); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1); transform: translateY(-1px); z-index: 5; }
+    .var-label { font-size: 10px; color: #6b7280; font-weight: 700; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .var-input { border: none; outline: none; font-size: 14px; width: 100%; color: var(--text-main); background: transparent; padding-right: 24px; }
+    .var-select-btn { position: absolute; right: 8px; bottom: 8px; color: #9ca3af; padding: 4px; cursor: pointer; }
+    .var-select-btn:hover { color: var(--primary); }
+    .dropdown-menu { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; max-height: 240px; overflow-y: auto; z-index: 100; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); display: none; }
+    .dropdown-item { padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f3f4f6; color: #4b5563; }
     .dropdown-item:hover { background: var(--primary-bg); color: var(--primary); }
 
     /* 高亮文本 */
@@ -85,7 +87,7 @@
     .nav-btn.active { color: var(--primary); }
 
     /* 移动端预览卡片 */
-    .mobile-preview-widget { display: none; background: white; border: 1px solid #e0e7ff; border-radius: var(--radius); padding: 12px; margin-bottom: 16px; font-size: 12px; color: #4b5563; max-height: 120px; overflow-y: auto; font-family: monospace; line-height: 1.6; }
+    .mobile-preview-widget { display: none; background: white; border: 1px solid #e0e7ff; border-radius: var(--radius); padding: 12px; margin-bottom: 16px; font-size: 12px; color: #4b5563; max-height: 120px; overflow-y: auto; font-family: monospace; line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
 
     /* 动画 */
     @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -109,20 +111,21 @@
         .app-container { padding-bottom: 60px; } /* 为底部导航留空 */
     }
 </style>
-<!-- HTML2Canvas (唯一外部脚本，即使失败也不影响主功能) -->
+<!-- HTML2Canvas (唯一外部脚本) -->
 <script src="https://cdn.staticfile.net/html2canvas/1.4.1/html2canvas.min.js" onerror="console.warn('Screenshot lib failed to load')"></script>
 </head>
 <body>
 
 <div class="app-container">
     
-    <!-- 1. 左侧：模版列表 -->
+    <!-- 1. 左侧：模版管理 (Template Management) -->
     <div id="sidebar" class="sidebar">
         <div class="toolbar" style="justify-content: flex-start; gap: 10px;">
-            <div style="font-weight: 800; font-size: 18px; color: var(--primary);">提示词填空器</div>
-            <div style="font-size: 10px; background: var(--primary-bg); color: var(--primary); padding: 2px 6px; border-radius: 4px;">V0.5.0</div>
+            <div style="font-weight: 800; font-size: 18px; color: var(--primary);">咒语魔盒</div>
+            <div style="font-size: 10px; background: var(--primary-bg); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: bold;">V0.5.2</div>
         </div>
-        <div id="template-list" class="scroll-y" style="padding: 10px 0;">
+        <div style="padding: 10px 16px 5px; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase;">我的模版</div>
+        <div id="template-list" class="scroll-y" style="padding: 0 8px;">
             <!-- 模版列表由 JS 生成 -->
         </div>
         <div style="padding: 16px; border-top: 1px solid var(--border);">
@@ -133,7 +136,7 @@
         </div>
     </div>
 
-    <!-- 2. 中间：主要工作区 -->
+    <!-- 2. 中间：Editor (编辑/填空) -->
     <div class="main-area">
         <div class="toolbar">
             <div class="toolbar-group">
@@ -211,43 +214,97 @@
 <div class="bottom-nav">
     <button class="nav-btn" onclick="openPanel('sidebar')" id="nav-templates">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-        模版
+        模版管理
     </button>
     <button class="nav-btn active" onclick="openPanel('main')" id="nav-fill">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        填空
+        Editor
     </button>
     <button class="nav-btn" onclick="openPanel('config')" id="nav-config">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-        词库
+        词库配置
     </button>
 </div>
 
 <script>
     // --- 核心逻辑 (Vanilla JS) ---
 
-    // 1. 数据预设
+    // 1. 数据预设 (同步自原站 https://promptfill.tanshilong.com)
     const DEFAULT_TEMPLATES = [
-        { id: 't1', title: '角色概念分解图', content: "Role (角色设定)\n你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图。你具备“像素级拆解”的能力。\n\nTask (任务目标)\n生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情、核心道具。\n\nVisual Guidelines:\n1. 构图: 中心位放置角色的 {{layout_focus}} 。\n2. 拆解内容:\n•服装分层: 例如： {{clothing}}\n•私密内着: 例如： {{underwear_style}}\n•表情集: 如： {{expressions}}\n•材质特写: 例如： {{texture_zoom}}\n\nStyle:\n•画风: {{art_style}}\n•灯光: {{lighting}}" },
-        { id: 't2', title: '3x3 摄影网格', content: "创建一个 3x3 的摄影网格，展示 {{subject}} 的不同角度。\n风格: {{art_style}}\n光线: {{lighting}}\n每个格子应该展示: {{action_pose}}\n构图参考: {{camera_angle}}" }
+        { 
+            id: 't1', 
+            title: '角色概念分解图', 
+            icon: '👤',
+            content: `Role (角色设定)\n你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图（Character Sheet）。你具备“像素级拆解”的能力，能够透视角色的穿着层级、捕捉微表情变化，并将与其相关的物品进行具象化还原。你特别擅长通过 {{subject}} 的私密物品、随身物件和生活细节来侧面丰满人物性格与背景故事。\n\nTask (任务目标)\n根据用户上传或描述的主体形象，生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情、核心道具、材质特写，以及极具生活气息的私密与随身物品展示。\n\nVisual Guidelines (视觉规范)\n1. 构图布局(Layout):\n•中心位(Center): 放置角色的 {{layout_focus}} ，作为视觉锚点。\n•环绕位(Surroundings): 在中心人物四周空白处，有序排列拆解后的元素。\n•视觉引导(Connectors): 使用 {{connectors}} ，将周边的拆解物品与中心人物的对应部位或所属区域连接起来。\n\n2. 拆解内容(Deconstruction Details):\n•服装分层(Clothing Layers): 将角色的服装拆分为单品展示，例如： {{clothing}}\n•私密内着拆解: 独立展示角色的内层衣物，重点突出设计感与材质。例如： {{underwear_style}} （展示细节与剪裁）。\n•表情集(Expression Sheet): 在角落绘制3-4 个不同的头部特写，展示不同的情绪，如： {{expressions}} 。\n•材质特写(Texture & Zoom): 选取关键部位进行放大特写。例如： {{texture_zoom}} ，增加对小物件材质的描绘。\n•动作: 绘制特殊的动作和表情，例如： {{action_detail}} ，增加动作的深度刻画。\n•特殊视角: 绘制从某种特殊场景下拍摄的特殊视角，例如： {{special_view}}\n•关联物品(Related Items):\n•随身包袋与内容物: 绘制 {{bag_content}} ，并将其“打开”，展示散落在旁的物品。\n•美妆与护理: 展示 {{cosmetics}} 。\n•私密生活物件: 具象化角色隐藏面的物品。根据角色性格可能包括： {{private_items}} ，需以一种设计图的客观视角呈现。\n\n3. 风格与注释(Style & Annotations):\n•画风: {{art_style}} ，线条干净利落。\n•背景: {{background_style}} ，营造设计手稿的氛围。\n•灯光: {{lighting}}` 
+        },
+        { 
+            id: 't2', 
+            title: '3x3 摄影网格', 
+            icon: '📸',
+            content: `Create a 3x3 photography grid showing different angles and details of {{subject}}.\n\nSettings:\n• Role: {{role}}\n• Lens: {{lens_param}}\n• Lighting: {{lighting}}\n• Art Style: {{art_style}}\n\nGrid Content:\n1. Top Left: Close-up of face, {{expressions}}\n2. Top Center: Full body shot, {{grid_pose}}\n3. Top Right: Detail of {{clothing}}\n4. Center Left: Side profile\n5. Center: Main action shot, {{action_pose}}\n6. Center Right: Back view\n7. Bottom Left: Accessory detail, {{bag_content}}\n8. Bottom Center: Footwear/Shoes\n9. Bottom Right: Artistic blur or {{special_view}}` 
+        },
+        {
+            id: 't3',
+            title: '时尚情绪板插画',
+            icon: '🎨',
+            content: `Create a Fashion Moodboard Illustration for {{subject}}.\n\nCore Elements:\n• Main Outfit: {{clothing}}\n• Deconstruction: {{fashion_deconstruct}}\n• Under layer: {{underwear_style}}\n\nVibe & Style:\n• Art Style: {{art_style}}\n• Background: {{background_style}}\n• Lighting: {{lighting}}\n\nAccessories:\n• Bag content: {{bag_content}}\n• Cosmetics: {{cosmetics}}\n• Decor: {{sticker_decor}}`
+        },
+        {
+            id: 't4',
+            title: '人物趣味合影',
+            icon: '👯‍♀️',
+            content: `Draw a fun group photo featuring {{subject}} and {{character_companion}}.\n\nInteraction:\n• Pose: {{action_pose}}\n• Expressions: {{expressions}}\n• Toy Companion: {{toy_companion}}\n\nScene:\n• Location: {{background_scene}}\n• Lighting: {{lighting}}\n• Camera Angle: {{camera_angle}}\n\nStyle:\n• Art Style: {{art_style}}\n• Stickers: {{sticker_core}}`
+        }
     ];
     
+    // 同步原站词库数据
     const DEFAULT_OPTIONS = {
-        role: ["游戏概念设计师", "时尚摄影师", "电影导演"],
-        subject: ["赛博朋克黑客", "森林精灵", "都市白领"],
-        art_style: ["2D 插画", "吉卜力风格", "写实摄影"],
-        layout_focus: ["全身立绘", "半身像", "头部特写"],
-        lighting: ["自然光", "赛博霓虹", "伦勃朗光"],
-        clothing: ["机能风外套", "丝绸长裙", "战术背心"],
-        underwear_style: ["运动内衣", "蕾丝套装", "简约棉质"],
-        expressions: ["冷漠", "狂喜", "羞涩"]
+        // Character
+        role: ["游戏与动漫概念美术设计大师", "资深时尚摄影师", "电影分镜师", "人设画师"],
+        subject: ["女性角色", "赛博朋克黑客", "奇幻精灵游侠", "现代都市白领", "机甲驾驶员"],
+        character_companion: ["一只肥猫", "童年的自己", "宿敌", "全息投影AI"],
+        expressions: ["疯狂、病娇、狂喜", "冷漠、轻蔑、无视", "羞涩、脸红、躲闪", "自信、张扬、大笑"],
+        
+        // Action
+        grid_pose: ["站立、坐姿、动态跑跳", "战斗姿态展示", "日常休闲动作"],
+        action_detail: ["带着项圈的爬行", "拔剑战斗姿态", "优雅的下午茶时光", "整理领带"],
+        action_pose: ["背靠背战斗", "互相喂食", "摸头杀", "对峙"],
+        
+        // Visuals
+        layout_focus: ["全身立绘", "半身像", "特写镜头", "背影"],
+        camera_angle: ["平视", "低角度仰视", "高角度俯视", "荷兰角倾斜"],
+        connectors: ["手绘箭头或引导线", "虚线连接", "光效指引", "机械臂连接"],
+        texture_zoom: ["凌乱感与私处汗渍", "皮革纹理与磨损", "金属光泽与锈迹", "丝绸光泽"],
+        special_view: ["被踩在脚下的仰视视角", "上帝视角俯瞰", "鱼眼镜头特写", "监控摄像头视角"],
+        art_style: ["高质量的2D 插画风格", "吉卜力动画风格", "厚涂油画风格", "赛博朋克霓虹风格", "黑白漫画风格"],
+        background_style: ["漫画网格笔记本", "纯色极简背景", "赛博朋克霓虹街道", "废弃工厂内部"],
+        lens_param: ["85mm 人像镜头", "35mm 人文广角", "200mm 长焦压缩", "微距镜头"],
+        lighting: ["自然光", "赛博霓虹光", "伦勃朗光", "边缘光(Rim Light)", "顶光"],
+        
+        // Items
+        underwear_style: ["成套的蕾丝内衣裤", "运动内衣", "棉质简约款", "绑带风格"],
+        clothing: ["机能风外套", "丝绸长裙", "战斗装甲", "JK制服", "旗袍"],
+        clothing_male: ["西装", "卫衣", "战术背心"],
+        clothing_female: ["连衣裙", "短裙", "紧身衣"],
+        bag_content: ["日常通勤包或手拿包", "战术背包", "魔法药剂袋", "散落的口红与手机"],
+        cosmetics: ["常用的化妆品组合", "战地急救包", "魔法符文绘制工具"],
+        private_items: ["震动棒与项圈", "日记本与旧照片", "护身符与水晶", "手铐与钥匙"],
+        fashion_deconstruct: ["面料色卡", "设计草图", "版型拆解"],
+        toy_companion: ["泰迪熊", "机械狗", "巫毒娃娃"],
+        sticker_core: ["爱心贴纸", "创可贴", "警告标识"],
+        sticker_decor: ["星星", "花瓣", "血迹"],
+        
+        // Location
+        background_scene: ["充满生活气息的卧室", "下雨的街道", "魔法学院图书馆", "太空舱"]
     };
 
+    // 变量分组配置 (同步原站分类)
     const VAR_GROUPS = {
-        character: { label: "人物", keys: ["role", "subject", "character_companion", "expressions"], color: "#3b82f6" },
-        action: { label: "动作", keys: ["grid_pose", "action_detail", "action_pose"], color: "#10b981" },
-        visuals: { label: "画面", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "art_style", "lighting"], color: "#8b5cf6" },
-        item: { label: "物品", keys: ["clothing", "underwear_style", "bag_content", "cosmetics"], color: "#f59e0b" },
+        character: { label: "人物 (CHARACTER)", keys: ["role", "subject", "character_companion", "expressions"], color: "#3b82f6" },
+        action: { label: "动作 (ACTION)", keys: ["grid_pose", "action_detail", "action_pose"], color: "#10b981" },
+        visuals: { label: "画面 (VISUALS)", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"], color: "#8b5cf6" },
+        item: { label: "物品 (ITEM)", keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"], color: "#f59e0b" },
+        location: { label: "地点 (LOCATION)", keys: ["background_scene"], color: "#ef4444" },
         other: { label: "其他变量", keys: [], color: "#6b7280" }
     };
 
@@ -286,7 +343,6 @@
         let text = tpl.content;
         
         if (html) {
-            // 生成带高亮的 HTML
             const parts = text.split(/(\{\{[^}]+\}\})/g);
             return parts.map(part => {
                 if (part.startsWith('{{') && part.endsWith('}}')) {
@@ -295,10 +351,9 @@
                     const cls = val ? 'hl-filled' : 'hl-empty';
                     return `<span class="hl-var ${cls}">${val || part}</span>`;
                 }
-                return part; // 简单文本转义可略，这里直接输出
+                return part;
             }).join('');
         } else {
-            // 生成纯文本
             vars.forEach(v => {
                 text = text.split(`{{${v}}}`).join(state.values[v] || `{{${v}}`);
             });
@@ -319,9 +374,11 @@
         const list = document.getElementById('template-list');
         list.innerHTML = state.templates.map(t => `
             <div class="template-item ${t.id === state.activeId ? 'active' : ''}" onclick="selectTemplate('${t.id}')">
-                <div class="template-indicator"></div>
-                <div class="template-title">${t.title}</div>
-                ${t.id === state.activeId ? `<button class="btn-ghost" style="padding:4px" onclick="deleteTemplate(event, '${t.id}')">×</button>` : ''}
+                <div class="template-icon">${t.icon || '📄'}</div>
+                <div class="template-info">
+                    <div class="template-title">${t.title}</div>
+                    <div class="template-desc">${t.content.substring(0, 30)}...</div>
+                </div>
             </div>
         `).join('');
     }
@@ -364,13 +421,18 @@
                 const val = state.values[v] || '';
                 html += `
                     <div class="var-input-card" style="border-left: 3px solid ${cfg.color}">
-                        <div class="var-label">${v}</div>
-                        <input class="var-input" value="${val}" oninput="updateValue('${v}', this.value)" placeholder="输入...">
-                        <button class="var-select-btn" onclick="toggleDropdown('${v}', this)">▼</button>
+                        <div class="var-label">
+                            <span>${v}</span>
+                            ${val ? `<span style="color:#10b981">✓</span>` : ''}
+                        </div>
+                        <input class="var-input" value="${val}" oninput="updateValue('${v}', this.value)" placeholder="点击输入或选择...">
+                        <div class="var-select-btn" onclick="toggleDropdown('${v}', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </div>
                         <div class="dropdown-menu" id="dropdown-${v}">
                             ${(state.options[v] || []).map(opt => 
                                 `<div class="dropdown-item" onclick="selectOption('${v}', '${opt}')">${opt}</div>`
-                            ).join('') || '<div style="padding:10px;color:#ccc;text-align:center">无选项</div>'}
+                            ).join('') || '<div style="padding:10px;color:#ccc;text-align:center;font-size:12px;">暂无预设选项</div>'}
                         </div>
                     </div>
                 `;
@@ -378,10 +440,6 @@
             html += `</div>`;
         });
         
-        // 只有当变量列表发生变化时才重绘，避免输入焦点丢失
-        // 简单处理：这里每次切换模版渲染。输入时不重绘整个列表，只更新值。
-        // 为了性能，我们这里只在 init 或者切换模版时完全重绘。
-        // 但是 updateValue 触发 renderPreview，不触发 renderInputs。
         if (container.dataset.tplId !== tpl.id) {
             container.innerHTML = html;
             container.dataset.tplId = tpl.id;
@@ -396,7 +454,6 @@
 
     function renderCodeEditor() {
         const tpl = getActiveTemplate();
-        // 避免在输入时重置光标，只在切换模版时更新值
         const titleInput = document.getElementById('template-title-input');
         const contentInput = document.getElementById('template-content-input');
         if (titleInput.dataset.tplId !== tpl.id) {
@@ -416,16 +473,18 @@
         if (!keys.includes(state.activeConfigKey) && keys.length > 0) state.activeConfigKey = keys[0];
 
         keysContainer.innerHTML = keys.map(k => `
-            <button onclick="setConfigKey('${k}')" style="padding:4px 8px;border-radius:12px;font-size:12px;border:1px solid var(--border);background:${k === state.activeConfigKey ? '#1f2937' : 'white'};color:${k === state.activeConfigKey ? 'white' : '#374151'}">${k}</button>
+            <button onclick="setConfigKey('${k}')" style="padding:4px 8px;border-radius:12px;font-size:12px;border:1px solid var(--border);background:${k === state.activeConfigKey ? '#1f2937' : 'white'};color:${k === state.activeConfigKey ? 'white' : '#374151'};margin-bottom:4px;">${k}</button>
         `).join('');
 
         // 渲染 Options
         currentKeyLabel.innerText = state.activeConfigKey;
         const opts = state.options[state.activeConfigKey] || [];
         listContainer.innerHTML = opts.map((o, idx) => `
-            <div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #f3f4f6;font-size:13px;">
-                <span>${o}</span>
-                <button style="color:#ef4444;" onclick="deleteOption('${state.activeConfigKey}', ${idx})">×</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #f3f4f6;font-size:13px;">
+                <span style="flex:1;word-break:break-all;margin-right:8px;">${o}</span>
+                <button style="color:#ef4444;padding:4px;" onclick="deleteOption('${state.activeConfigKey}', ${idx})">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
             </div>
         `).join('');
     }
@@ -434,18 +493,24 @@
     window.selectTemplate = (id) => {
         state.activeId = id;
         saveState();
-        render(); // 全量重绘
-        // 强制刷新输入区
+        render(); 
         document.getElementById('input-container').dataset.tplId = '';
         renderInputs();
         
-        // 移动端自动切回填空 Tab
-        if (window.innerWidth < 1024) openPanel('main');
+        // 交互优化：点击模版后自动跳转到填空区
+        if (window.innerWidth < 1024) {
+            // 移动端：切换到底部第二个Tab (Fill)
+            openPanel('main');
+        } else {
+            // PC端：视觉提示用户去右侧操作 (可选：高亮输入框容器)
+            const editor = document.getElementById('view-fill');
+            editor.animate([{ opacity: 0.5 }, { opacity: 1 }], { duration: 300 });
+        }
     };
 
     window.createNewTemplate = () => {
         const id = 't' + Date.now();
-        state.templates.push({ id, title: '新模版', content: '在这里输入内容，使用 {{变量}} ...' });
+        state.templates.push({ id, title: '未命名模版', icon: '📝', content: '输入 Prompt 内容，使用 {{变量名}} 来创建填空位...' });
         selectTemplate(id);
     };
 
@@ -471,7 +536,6 @@
     window.toggleDropdown = (key, btn) => {
         const menu = document.getElementById(`dropdown-${key}`);
         const isVisible = menu.style.display === 'block';
-        // 关闭所有
         document.querySelectorAll('.dropdown-menu').forEach(el => el.style.display = 'none');
         if (!isVisible) menu.style.display = 'block';
     };
@@ -479,15 +543,11 @@
     window.selectOption = (key, val) => {
         state.values[key] = val;
         saveState();
-        // 更新输入框显示
-        const inputs = document.querySelectorAll('.var-input');
-        // 找到对应的 input 更新 value (简单粗暴重绘也可以，但为了体验最好直接操作 DOM)
-        document.getElementById('input-container').dataset.tplId = ''; // 标记脏数据
+        document.getElementById('input-container').dataset.tplId = ''; 
         renderInputs(); 
         renderPreview();
     };
 
-    // 点击外部关闭下拉
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.var-input-card')) {
             document.querySelectorAll('.dropdown-menu').forEach(el => el.style.display = 'none');
@@ -502,7 +562,6 @@
         if (mode === 'code') renderCodeEditor();
     };
 
-    // 源码编辑监听
     document.getElementById('template-title-input').addEventListener('input', (e) => {
         const tpl = state.templates.find(t => t.id === state.activeId);
         if (tpl) { tpl.title = e.target.value; saveState(); renderSidebar(); }
@@ -512,12 +571,10 @@
         if (tpl) { 
             tpl.content = e.target.value; 
             saveState(); 
-            // 标记输入区脏数据，切换回填空模式时会自动重绘
             document.getElementById('input-container').dataset.tplId = ''; 
         }
     });
 
-    // 词库配置
     window.setConfigKey = (key) => { state.activeConfigKey = key; renderConfig(); };
     window.addOption = () => {
         const input = document.getElementById('new-option-input');
@@ -536,7 +593,6 @@
         renderConfig();
     };
 
-    // 复制与导出
     window.copyResult = () => {
         const text = generateText();
         navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
@@ -551,7 +607,6 @@
         }).catch(() => alert('生成图片失败'));
     };
 
-    // 移动端面板控制
     window.openPanel = (panelName) => {
         document.getElementById('sidebar').classList.remove('open');
         document.getElementById('config-panel').classList.remove('open');
@@ -569,15 +624,17 @@
     };
     window.closeAllPanels = () => openPanel('main');
     window.toggleConfig = () => {
-        // PC端配置面板开关逻辑 (这里简化处理，PC端始终显示或覆盖)
         const panel = document.getElementById('config-panel');
-        panel.style.transform = panel.style.transform === 'translateX(100%)' ? 'translateX(0)' : 'translateX(100%)';
-        // PC端我们用 absolute 或 fixed 覆盖，或者上面的 CSS 已经处理了
-        // 实际上上面的 CSS 对于 PC (min-width: 1024) 设定了 config-panel 始终显示。
-        // 如果想做开关，需要 JS 修改 style。
-        // 鉴于 V0.5 追求稳定，PC端配置栏常驻即可，或者做一个简单的 Overlay。
-        // 这里为了简单，PC端点击按钮时弹出一个 Alert 提示“请在右侧操作”或者简单切换显示。
-        alert("PC端配置面板已在右侧显示"); 
+        // PC端配置面板切换 (通过 transform)
+        // 默认为 relative/transform:none，但在 <1024px 时是 fixed
+        // 我们这里为 PC 增加一个显式的显示/隐藏类
+        if (window.innerWidth >= 1024) {
+            // PC端简单提示
+            alert("词库配置面板已在右侧显示");
+        } else {
+            // 移动端逻辑
+            openPanel('config');
+        }
     };
 
     // 初始化

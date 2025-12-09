@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>咒语魔盒 (Prompt Fill Tool) V0.6.0</title>
+<title>咒语魔盒 (Prompt Fill Tool) V0.6.1</title>
 <style>
     /* --- 核心变量 --- */
     :root {
@@ -17,20 +17,16 @@
         --danger: #ef4444;
         --radius: 12px;
         --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --modal-bg: rgba(0, 0, 0, 0.5);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg-body); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
     
     /* --- 布局框架 --- */
     .app-container { display: flex; flex: 1; overflow: hidden; position: relative; }
-    
-    /* 1. 左侧：模版列表 (PC常驻, 移动端作为 Tab1) */
     .sidebar { width: 300px; background: var(--bg-white); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 20; }
-    
-    /* 2. 右侧/主区域 */
     .main-viewport { flex: 1; display: flex; flex-direction: column; background: var(--bg-body); position: relative; overflow: hidden; }
     
-    /* 视图容器 (用于切换 Config 和 Editor) */
     .view-container { flex: 1; display: none; flex-direction: column; overflow: hidden; height: 100%; }
     .view-container.active { display: flex; }
 
@@ -49,46 +45,19 @@
     .scroll-y::-webkit-scrollbar { width: 4px; }
     .scroll-y::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
 
-    /* --- 模版列表项 (复刻 IMG_2944) --- */
+    /* --- 模版列表项 --- */
     .template-item { padding: 16px; margin: 12px 16px; background: var(--bg-white); border-radius: var(--radius); cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
     .template-item:hover { box-shadow: var(--shadow); }
-    
-    /* 选中状态 */
     .template-item.active { border: 1px solid #c7d2fe; background: var(--bg-white); box-shadow: 0 0 0 2px var(--primary-bg); position: relative; }
     .template-item.active::before { content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; background: var(--primary); border-radius: 0 4px 4px 0; }
-    
     .tpl-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
     .tpl-title { font-size: 15px; font-weight: 600; color: var(--text-main); }
     .tpl-actions { display: none; gap: 4px; }
     .template-item.active .tpl-actions { display: flex; }
     
-    /* --- 词库配置视图 (复刻 IMG_2945) --- */
-    .config-view { padding: 16px; background: var(--bg-body); }
-    .config-group { margin-bottom: 24px; }
-    .config-group-header { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-    
-    .var-config-card { background: var(--bg-white); border-radius: 12px; border: 1px solid var(--border); margin-bottom: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
-    .var-header { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: var(--bg-white); }
-    .var-header:hover { background: #f9fafb; }
-    .var-name { font-size: 14px; font-weight: 600; color: var(--text-main); display: flex; flex-direction: column; }
-    .var-key { font-size: 11px; color: var(--text-sub); font-family: monospace; margin-top: 2px; }
-    
-    .var-body { border-top: 1px solid #f3f4f6; padding: 0; display: none; background: #f9fafb; }
-    .var-config-card.open .var-body { display: block; }
-    
-    .option-item { padding: 10px 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 13px; background: white; }
-    .option-item:last-child { border-bottom: none; }
-    
-    .add-option-row { padding: 8px 12px; display: flex; gap: 8px; background: #f3f4f6; border-top: 1px solid #e5e7eb; }
-    .add-input { flex: 1; border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 10px; font-size: 13px; outline: none; }
-    .add-btn-small { background: var(--primary); color: white; border-radius: 6px; width: 32px; height: 32px; flex-shrink: 0; }
-
-    /* --- Editor 视图 (复刻 IMG_2946) --- */
+    /* --- Editor 视图 --- */
     .editor-layout { display: flex; height: 100%; flex-direction: column; }
-    /* PC端横向分栏 */
-    @media (min-width: 1024px) {
-        .editor-layout { flex-direction: row; }
-    }
+    @media (min-width: 1024px) { .editor-layout { flex-direction: row; } }
     
     .editor-left { flex: 1; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-white); max-width: 100%; }
     @media (min-width: 1024px) { .editor-left { max-width: 450px; } }
@@ -96,13 +65,18 @@
     .editor-right { flex: 1; background: #f3f4f6; padding: 30px; overflow-y: auto; display: none; }
     @media (min-width: 1024px) { .editor-right { display: block; } }
 
-    /* 输入框样式 */
+    /* 输入框样式 (交互优化) */
     .field-card { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; }
-    .field-label { font-size: 12px; font-weight: 600; color: #4b5563; margin-bottom: 6px; display: flex; justify-content: space-between; }
-    .field-input-wrapper { position: relative; }
-    .field-input { width: 100%; padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; outline: none; transition: 0.2s; }
+    .field-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .field-label { font-size: 13px; font-weight: 600; color: #374151; display: flex; align-items: center; gap: 4px; }
+    .field-var-key { font-size: 10px; color: #9ca3af; font-family: monospace; background: #f3f4f6; padding: 2px 4px; border-radius: 4px; }
+    
+    .field-input-container { position: relative; display: flex; gap: 8px; }
+    .field-input { flex: 1; padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; outline: none; transition: 0.2s; }
     .field-input:focus { background: white; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-bg); }
-    .field-dropdown-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 4px; color: #9ca3af; }
+    
+    .field-select-btn { width: 40px; display: flex; align-items: center; justify-content: center; background: #eef2ff; color: var(--primary); border-radius: 8px; border: 1px solid #c7d2fe; cursor: pointer; transition: 0.2s; }
+    .field-select-btn:active { transform: scale(0.95); background: #e0e7ff; }
 
     /* 预览卡片 */
     .preview-paper { background: white; padding: 40px; min-height: 600px; box-shadow: var(--shadow); border-radius: 8px; font-family: monospace; font-size: 14px; line-height: 1.8; color: #374151; white-space: pre-wrap; }
@@ -119,35 +93,55 @@
     .pc-tab { padding: 6px 16px; font-size: 13px; font-weight: 600; color: #6b7280; border-radius: 6px; }
     .pc-tab.active { background: white; color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
+    /* --- 通用弹窗选择器 (Modal) --- */
+    .modal-overlay { position: fixed; inset: 0; background: var(--modal-bg); z-index: 100; display: none; align-items: flex-end; justify-content: center; backdrop-filter: blur(2px); opacity: 0; transition: opacity 0.2s; }
+    .modal-overlay.open { display: flex; opacity: 1; }
+    
+    /* 默认是 Bottom Sheet (Mobile) */
+    .modal-content { background: white; width: 100%; max-height: 80vh; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    .modal-overlay.open .modal-content { transform: translateY(0); }
+    
+    /* PC端改为居中弹窗 */
+    @media (min-width: 1024px) {
+        .modal-overlay { align-items: center; }
+        .modal-content { width: 400px; max-height: 600px; border-radius: 16px; transform: scale(0.95); opacity: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal-overlay.open .modal-content { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header { padding: 16px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { font-weight: 700; font-size: 16px; color: var(--text-main); }
+    .modal-body { overflow-y: auto; padding: 0; flex: 1; }
+    
+    .select-item { padding: 12px 16px; border-bottom: 1px solid #f9fafb; cursor: pointer; font-size: 14px; color: #4b5563; transition: 0.1s; }
+    .select-item:active { background: #f3f4f6; }
+    .select-item:last-child { border-bottom: none; }
+    .select-item.new-item-btn { color: var(--primary); font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 16px; border-top: 1px solid #eee; }
+
     /* 响应式显示控制 */
     @media (min-width: 1024px) {
         .bottom-nav { display: none; }
-        .sidebar { display: flex !important; } /* PC侧边栏常驻 */
-        .view-template-mobile { display: none !important; } /* PC不显示模版管理的移动视图 */
+        .sidebar { display: flex !important; }
+        .view-template-mobile { display: none !important; }
     }
     @media (max-width: 1023px) {
-        .sidebar { display: none; } /* 移动端侧边栏默认隐藏，内容由 Tab1 接管 */
+        .sidebar { display: none; }
         .pc-header { display: none; }
         .view-container { padding-bottom: 60px; }
         .main-viewport { flex: 1; }
     }
 </style>
-<!-- 引入 html2canvas 用于长图生成 -->
-<script src="https://cdn.staticfile.net/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
 <div class="app-container">
     
-    <!-- 左侧侧边栏 (仅 PC 显示) -->
+    <!-- 左侧：模版管理 (PC) -->
     <div class="sidebar pc-only-flex">
         <div style="padding: 20px; border-bottom: 1px solid var(--border);">
             <div style="font-size: 18px; font-weight: 800; color: var(--primary);">咒语魔盒</div>
-            <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Prompt Fill Tool V0.6.0</div>
+            <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Prompt Fill Tool V0.6.1</div>
         </div>
-        <div id="pc-template-list" class="scroll-y" style="padding: 10px 0;">
-            <!-- 模版列表 (PC) -->
-        </div>
+        <div id="pc-template-list" class="scroll-y" style="padding: 10px 0;"></div>
         <div style="padding: 16px; border-top: 1px solid var(--border);">
             <button class="btn-primary" onclick="createNewTemplate()">+ 新建模版</button>
         </div>
@@ -156,45 +150,36 @@
     <!-- 主视口 -->
     <div class="main-viewport">
         
-        <!-- PC 顶部工具栏 (切换 Config/Editor) -->
+        <!-- PC 顶部栏 -->
         <div class="pc-header">
             <div class="pc-tabs">
                 <button class="pc-tab active" onclick="switchTab('editor')" id="pc-tab-editor">Editor (填空)</button>
                 <button class="pc-tab" onclick="switchTab('config')" id="pc-tab-config">词库配置</button>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="btn-icon" onclick="exportImage()" title="保存图片">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                </button>
                 <button class="btn-primary" style="width: auto; padding: 8px 16px;" onclick="copyResult()">复制结果</button>
             </div>
         </div>
 
-        <!-- 视图 1: 模版管理 (移动端 Tab 1) -->
+        <!-- 视图 1: 模版管理 (Mobile) -->
         <div id="view-templates" class="view-container view-template-mobile">
             <div style="padding: 16px 20px; background: white; border-bottom: 1px solid var(--border);">
                 <div style="font-size: 20px; font-weight: 800;">模版管理</div>
                 <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">切换或管理不同 Prompt</div>
             </div>
-            <div id="mobile-template-list" class="scroll-y" style="background: #f9fafb;">
-                <!-- 模版列表 (Mobile) -->
-            </div>
+            <div id="mobile-template-list" class="scroll-y" style="background: #f9fafb;"></div>
             <div style="padding: 16px; background: white; border-top: 1px solid var(--border);">
                 <button class="btn-primary" onclick="createNewTemplate()">+ 新建模版</button>
             </div>
         </div>
 
-        <!-- 视图 2: 词库配置 (Config) -->
+        <!-- 视图 2: 词库配置 -->
         <div id="view-config" class="view-container">
-            <div style="padding: 16px 20px; background: white; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-size: 18px; font-weight: 800;">词库配置</div>
-                    <div style="font-size: 11px; color: #9ca3af;">所有模版共享同一套词库</div>
-                </div>
+            <div style="padding: 16px 20px; background: white; border-bottom: 1px solid var(--border);">
+                <div style="font-size: 18px; font-weight: 800;">词库配置</div>
+                <div style="font-size: 11px; color: #9ca3af;">管理分类与候选项</div>
             </div>
-            <div id="config-list" class="scroll-y config-view">
-                <!-- 词库列表 -->
-            </div>
+            <div id="config-list" class="scroll-y" style="padding: 16px; background: var(--bg-body);"></div>
         </div>
 
         <!-- 视图 3: Editor (填空) -->
@@ -204,20 +189,18 @@
                 <div class="editor-left">
                     <div style="padding: 16px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-weight: 700; font-size: 14px;" id="editor-title">未选择模版</span>
-                        <div style="display: flex; gap: 8px;">
-                            <button class="btn-icon" style="font-size: 12px;" onclick="switchMode()">切换源码/填空</button>
-                        </div>
+                        <button class="btn-icon" style="font-size: 12px;" onclick="switchMode()">切换模式</button>
                     </div>
                     
-                    <!-- 移动端预览条 -->
+                    <!-- Mobile Preview Bar -->
                     <div class="lg:hidden" style="padding: 12px; background: #eef2ff; border-bottom: 1px solid #e0e7ff; font-size: 12px; color: var(--primary); display: flex; justify-content: space-between; align-items: center;">
-                        <span>实时预览中...</span>
+                        <span id="mobile-preview-hint">实时预览中...</span>
                         <button style="font-weight: bold;" onclick="copyResult()">复制</button>
                     </div>
 
                     <div id="editor-inputs" class="scroll-y"></div>
                     
-                    <!-- 源码模式编辑器 (默认隐藏) -->
+                    <!-- Code Editor -->
                     <div id="code-editor" style="display: none; height: 100%; flex-direction: column;">
                         <input id="tpl-title-input" placeholder="模版标题" style="padding: 16px; border-bottom: 1px solid #eee; outline: none; font-weight: bold;">
                         <textarea id="tpl-content-input" style="flex: 1; padding: 16px; outline: none; border: none; resize: none; line-height: 1.6;" placeholder="在此输入 Prompt..."></textarea>
@@ -235,7 +218,7 @@
 
 </div>
 
-<!-- 底部导航栏 (Mobile) -->
+<!-- 底部导航 (Mobile) -->
 <div class="bottom-nav">
     <div class="nav-item" onclick="switchTab('templates')" id="nav-templates">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
@@ -251,45 +234,41 @@
     </div>
 </div>
 
+<!-- 弹窗选择器 (Modal) -->
+<div id="selection-modal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-title">选择选项</span>
+            <button onclick="closeModal()" style="padding: 4px; color: #9ca3af;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="modal-body" id="modal-list">
+            <!-- 选项列表 -->
+        </div>
+        <div class="select-item new-item-btn" onclick="addCustomOptionFromModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            添加自定义选项
+        </div>
+    </div>
+</div>
+
 <script>
-// --- 数据层 ---
-const DEFAULT_DATA = {
-    templates: [
-        { id: 't1', title: '角色概念分解图', content: "Role (角色设定)\n你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图。你具备“像素级拆解”的能力。\n\nTask (任务目标)\n生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情。\n\nVisual Guidelines:\n1. 构图: 中心位放置角色的 {{layout_focus}} 。\n2. 拆解内容:\n•服装分层: 例如： {{clothing}}\n•私密内着: 例如： {{underwear_style}}\n•表情集: 如： {{expressions}}\n•材质特写: 例如： {{texture_zoom}}\n\nStyle:\n•画风: {{art_style}}\n•灯光: {{lighting}}" },
-        { id: 't2', title: '3x3 摄影网格', content: "创建一个 3x3 的摄影网格，展示 {{subject}} 的不同角度。\n风格: {{art_style}}\n光线: {{lighting}}\n每个格子应该展示: {{action_pose}}\n构图参考: {{camera_angle}}" },
-        { id: 't3', title: '时尚情绪板插画', content: "Create a Fashion Moodboard Illustration for {{subject}}.\n\nElements:\n• Outfit: {{clothing}}\n• Deconstruction: {{fashion_deconstruct}}\n\nStyle:\n• Art: {{art_style}}\n• Bg: {{background_style}}\n• Items: {{bag_content}}" },
-        { id: 't4', title: '人物趣味合影', content: "Draw a fun group photo featuring {{subject}} and {{character_companion}}.\n\nInteraction:\n• Pose: {{action_pose}}\n• Expressions: {{expressions}}\n• Toy: {{toy_companion}}\n\nScene:\n• Location: {{background_scene}}\n• Lighting: {{lighting}}" }
-    ],
-    options: {
-        role: ["游戏概念设计师", "时尚摄影师", "电影导演", "人设画师"],
-        subject: ["赛博朋克黑客", "森林精灵", "都市白领", "机甲驾驶员"],
-        character_companion: ["一只肥猫", "童年的自己", "宿敌"],
-        expressions: ["疯狂、病娇", "冷漠、无视", "羞涩、脸红"],
-        grid_pose: ["站立、坐姿", "战斗姿态", "日常休闲"],
-        action_detail: ["带着项圈爬行", "拔剑战斗", "优雅喝茶"],
-        action_pose: ["背靠背战斗", "互相喂食", "摸头杀"],
-        layout_focus: ["全身立绘", "半身像", "特写镜头"],
-        camera_angle: ["平视", "低角度仰视", "高角度俯视"],
-        connectors: ["手绘箭头", "虚线连接", "光效指引"],
-        texture_zoom: ["皮革纹理", "金属锈迹", "丝绸光泽"],
-        special_view: ["俯视", "仰视", "鱼眼镜头"],
-        art_style: ["2D 插画", "吉卜力风格", "厚涂油画", "赛博霓虹"],
-        background_style: ["漫画网格", "纯色极简", "赛博街道"],
-        lens_param: ["85mm 人像", "35mm 广角"],
-        lighting: ["自然光", "赛博霓虹", "伦勃朗光"],
-        underwear_style: ["蕾丝内衣", "运动内衣", "棉质简约"],
-        clothing: ["机能风外套", "丝绸长裙", "战斗装甲", "JK制服"],
-        clothing_male: ["西装", "卫衣"],
-        clothing_female: ["连衣裙", "短裙"],
-        bag_content: ["口红与手机", "战术背包", "魔法药剂"],
-        cosmetics: ["补妆镜", "急救包"],
-        private_items: ["日记本", "怀表", "护身符"],
-        fashion_deconstruct: ["面料色卡", "设计草图"],
-        toy_companion: ["泰迪熊", "机械狗"],
-        sticker_core: ["爱心贴纸", "创可贴"],
-        sticker_decor: ["星星", "花瓣"],
-        background_scene: ["卧室", "雨中街道", "图书馆", "太空舱"]
-    }
+// --- 数据配置 (全量同步) ---
+const VAR_MAP = {
+    // Character
+    role: "角色身份", subject: "主体对象", character_companion: "合影角色", expressions: "表情集",
+    // Action
+    grid_pose: "九宫格动作", action_detail: "动作细节", action_pose: "互动姿势",
+    // Visuals
+    layout_focus: "构图重心", camera_angle: "拍摄角度", connectors: "视觉引导", texture_zoom: "材质特写",
+    special_view: "特殊视角", art_style: "画风", background_style: "背景风格", lens_param: "九宫格镜头", lighting: "灯光布置",
+    // Items
+    underwear_style: "私密内着拆解", clothing: "人物服饰", clothing_male: "男性服饰", clothing_female: "女性服饰",
+    bag_content: "随身包袋", cosmetics: "美妆与护理", private_items: "私密生活物件", fashion_deconstruct: "穿搭解构",
+    toy_companion: "互动公仔", sticker_core: "核心贴纸", sticker_decor: "装饰元素",
+    // Location
+    background_scene: "背景场景"
 };
 
 const VAR_GROUPS = {
@@ -297,18 +276,60 @@ const VAR_GROUPS = {
     action: { label: "动作 (ACTION)", keys: ["grid_pose", "action_detail", "action_pose"], color: "#10b981" },
     visuals: { label: "画面 (VISUALS)", keys: ["layout_focus", "camera_angle", "connectors", "texture_zoom", "special_view", "art_style", "background_style", "lens_param", "lighting"], color: "#8b5cf6" },
     item: { label: "物品 (ITEM)", keys: ["underwear_style", "clothing", "clothing_male", "clothing_female", "bag_content", "cosmetics", "private_items", "fashion_deconstruct", "toy_companion", "sticker_core", "sticker_decor"], color: "#f59e0b" },
-    location: { label: "地点 (LOCATION)", keys: ["background_scene"], color: "#ef4444" },
-    other: { label: "其他变量", keys: [], color: "#6b7280" }
+    location: { label: "地点 (LOCATION)", keys: ["background_scene"], color: "#ef4444" }
 };
+
+const DEFAULT_OPTIONS = {
+    role: ["游戏与动漫概念美术设计大师", "资深时尚摄影师", "电影分镜师", "人设画师"],
+    subject: ["女性角色", "赛博朋克黑客", "奇幻精灵游侠", "现代都市白领", "机甲驾驶员"],
+    character_companion: ["一只肥猫", "童年的自己", "宿敌", "全息投影AI", "死侍", "超人", "爱因斯坦"],
+    expressions: ["疯狂、病娇、狂喜", "冷漠、轻蔑、无视", "羞涩、脸红、躲闪", "自信、张扬、大笑"],
+    grid_pose: ["站立、坐姿、动态跑跳", "战斗姿态展示", "日常休闲动作"],
+    action_detail: ["带着项圈的爬行", "拔剑战斗姿态", "优雅的下午茶时光", "整理领带"],
+    action_pose: ["背靠背战斗", "互相喂食", "摸头杀", "对峙", "勾肩搭背比V字手势"],
+    layout_focus: ["全身立绘", "半身像", "特写镜头", "背影"],
+    camera_angle: ["平视", "低角度仰视", "高角度俯视", "荷兰角倾斜"],
+    connectors: ["手绘箭头或引导线", "虚线连接", "光效指引", "机械臂连接"],
+    texture_zoom: ["凌乱感与私处汗渍", "皮革纹理与磨损", "金属光泽与锈迹", "丝绸光泽"],
+    special_view: ["被踩在脚下的仰视视角", "上帝视角俯瞰", "鱼眼镜头特写", "监控摄像头视角"],
+    art_style: ["高质量的2D 插画风格", "吉卜力动画风格", "厚涂油画风格", "赛博朋克霓虹风格", "黑白漫画风格"],
+    background_style: ["漫画网格笔记本", "纯色极简背景", "赛博朋克霓虹街道", "废弃工厂内部"],
+    lens_param: ["85mm 人像镜头", "35mm 人文广角", "200mm 长焦压缩", "微距镜头"],
+    lighting: ["自然光", "赛博霓虹光", "伦勃朗光", "边缘光(Rim Light)", "顶光"],
+    underwear_style: ["成套的蕾丝内衣裤", "运动内衣", "棉质简约款", "绑带风格"],
+    clothing: ["机能风外套", "丝绸长裙", "战斗装甲", "JK制服", "旗袍"],
+    clothing_male: ["西装", "卫衣", "战术背心"],
+    clothing_female: ["连衣裙", "短裙", "紧身衣"],
+    bag_content: ["日常通勤包或手拿包", "战术背包", "魔法药剂袋", "散落的口红与手机"],
+    cosmetics: ["常用的化妆品组合", "战地急救包", "魔法符文绘制工具"],
+    private_items: ["震动棒与项圈", "日记本与旧照片", "护身符与水晶", "手铐与钥匙"],
+    fashion_deconstruct: ["面料色卡", "设计草图", "版型拆解"],
+    toy_companion: ["泰迪熊", "机械狗", "巫毒娃娃"],
+    sticker_core: ["爱心贴纸", "创可贴", "警告标识"],
+    sticker_decor: ["星星", "花瓣", "血迹"],
+    background_scene: ["充满生活气息的卧室", "下雨的街道", "魔法学院图书馆", "太空舱", "外太空飞船内部"]
+};
+
+const DEFAULT_TEMPLATES = [
+    { 
+        id: 't1', title: '角色概念分解图', 
+        content: `Role (角色设定)\n你是一位顶尖的 {{role}} ，擅长制作详尽的角色设定图（Character Sheet）。你具备“像素级拆解”的能力，能够透视角色的穿着层级、捕捉微表情变化，并将与其相关的物品进行具象化还原。你特别擅长通过 {{subject}} 的私密物品、随身物件和生活细节来侧面丰满人物性格与背景故事。\n\nTask (任务目标)\n根据用户上传或描述的主体形象，生成一张“全景式角色深度概念分解图”。该图片必须包含 {{layout_focus}} ，并在其周围环绕展示该人物的服装分层、不同表情、核心道具、材质特写，以及极具生活气息的私密与随身物品展示。\n\nVisual Guidelines (视觉规范)\n1. 构图布局(Layout):\n•中心位(Center): 放置角色的 {{layout_focus}} ，作为视觉锚点。\n•环绕位(Surroundings): 在中心人物四周空白处，有序排列拆解后的元素。\n•视觉引导(Connectors): 使用 {{connectors}} ，将周边的拆解物品与中心人物的对应部位或所属区域连接起来。\n\n2. 拆解内容(Deconstruction Details):\n•服装分层(Clothing Layers): 将角色的服装拆分为单品展示，例如： {{clothing}}\n•私密内着拆解: 独立展示角色的内层衣物，重点突出设计感与材质。例如： {{underwear_style}} （展示细节与剪裁）。\n•表情集(Expression Sheet): 在角落绘制3-4 个不同的头部特写，展示不同的情绪，如： {{expressions}} 。\n•材质特写(Texture & Zoom): 选取关键部位进行放大特写。例如： {{texture_zoom}} ，增加对小物件材质的描绘。\n•动作: 绘制特殊的动作和表情，例如： {{action_detail}} ，增加动作的深度刻画。\n•特殊视角: 绘制从某种特殊场景下拍摄的特殊视角，例如： {{special_view}}\n•关联物品(Related Items):\n•随身包袋与内容物: 绘制 {{bag_content}} ，并将其“打开”，展示散落在旁的物品。\n•美妆与护理: 展示 {{cosmetics}} 。\n•私密生活物件: 具象化角色隐藏面的物品。根据角色性格可能包括： {{private_items}} ，需以一种设计图的客观视角呈现。\n\n3. 风格与注释(Style & Annotations):\n•画风: {{art_style}} ，线条干净利落。\n•背景: {{background_style}} ，营造设计手稿的氛围。\n•灯光: {{lighting}}` 
+    },
+    { 
+        id: 't2', title: '3x3 摄影网格', 
+        content: `Create a 3x3 photography grid showing different angles and details of {{subject}}.\n\nSettings:\n• Role: {{role}}\n• Lens: {{lens_param}}\n• Lighting: {{lighting}}\n• Art Style: {{art_style}}\n\nGrid Content:\n1. Top Left: Close-up of face, {{expressions}}\n2. Top Center: Full body shot, {{grid_pose}}\n3. Top Right: Detail of {{clothing}}\n4. Center Left: Side profile\n5. Center: Main action shot, {{action_pose}}\n6. Center Right: Back view\n7. Bottom Left: Accessory detail, {{bag_content}}\n8. Bottom Center: Footwear/Shoes\n9. Bottom Right: Artistic blur or {{special_view}}` 
+    },
+    { id: 't3', title: '时尚情绪板插画', content: `Create a Fashion Moodboard Illustration for {{subject}}.\n\nElements:\n• Outfit: {{clothing}}\n• Deconstruction: {{fashion_deconstruct}}\n\nStyle:\n• Art: {{art_style}}\n• Bg: {{background_style}}\n• Items: {{bag_content}}` },
+    { id: 't4', title: '人物趣味合影', content: `Character Selfie (人物趣味合影)\n\n让 {{character_companion}} 站在 {{subject}} 旁边，\n\n{{action_pose}} ，同时对着镜头露出 {{expressions}} 的表情。\n\n背景：以 {{background_scene}} 为背景。\n\n要求：保持自拍构图不变，让两个角色自然地融入画面，光影统一，互动自然。` }
+];
 
 // --- 状态管理 ---
 let state = {
-    templates: JSON.parse(localStorage.getItem('pf_v6_tpl')) || DEFAULT_DATA.templates,
-    options: JSON.parse(localStorage.getItem('pf_v6_opt')) || DEFAULT_DATA.options,
+    templates: JSON.parse(localStorage.getItem('pf_v6_tpl')) || DEFAULT_TEMPLATES,
+    options: JSON.parse(localStorage.getItem('pf_v6_opt')) || DEFAULT_OPTIONS,
     activeId: localStorage.getItem('pf_v6_id') || 't1',
     values: JSON.parse(localStorage.getItem('pf_v6_val')) || {},
-    tab: 'editor', // templates, config, editor
-    mode: 'fill'   // fill, code
+    tab: 'editor', mode: 'fill', currentModalVar: null
 };
 
 // --- 核心函数 ---
@@ -320,23 +341,17 @@ function save() {
     render();
 }
 
-function getActiveTpl() {
-    return state.templates.find(t => t.id === state.activeId) || state.templates[0];
-}
-
+function getActiveTpl() { return state.templates.find(t => t.id === state.activeId) || state.templates[0]; }
 function getVars(content) {
     const regex = /\{\{([^}]+)\}\}/g, found = new Set();
-    let m;
-    while ((m = regex.exec(content)) !== null) found.add(m[1].trim());
+    let m; while ((m = regex.exec(content)) !== null) found.add(m[1].trim());
     return Array.from(found);
 }
-
 function genText(html = false) {
     const tpl = getActiveTpl();
     if (!tpl) return "";
     let txt = tpl.content;
     const vars = getVars(txt);
-    
     if (html) {
         return txt.split(/(\{\{[^}]+\}\})/g).map(p => {
             if (p.startsWith('{{') && p.endsWith('}}')) {
@@ -346,218 +361,181 @@ function genText(html = false) {
             }
             return p;
         }).join('');
-    } else {
-        vars.forEach(v => txt = txt.split(`{{${v}}}`).join(state.values[v] || `{{${v}}`));
-        return txt;
     }
+    vars.forEach(v => txt = txt.split(`{{${v}}}`).join(state.values[v] || `{{${v}}`));
+    return txt;
 }
 
 // --- 渲染逻辑 ---
 function render() {
-    // 1. 渲染模版列表 (Mobile & PC)
+    // 模版列表
     const tplHtml = state.templates.map(t => `
         <div class="template-item ${t.id === state.activeId ? 'active' : ''}" onclick="selectTemplate('${t.id}')">
-            <div class="tpl-header">
-                <div class="tpl-title">${t.title}</div>
-            </div>
-            <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">${t.content.substring(0,25)}...</div>
+            <div class="tpl-header"><div class="tpl-title">${t.title}</div></div>
             <div class="tpl-actions">
-                <button class="btn-icon" onclick="editTemplate('${t.id}', event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                <button class="btn-icon" onclick="copyTemplate('${t.id}', event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
-                <button class="btn-icon danger" onclick="deleteTemplate('${t.id}', event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                <button class="btn-icon" onclick="editTemplate('${t.id}', event)">✎</button>
+                <button class="btn-icon" onclick="copyTemplate('${t.id}', event)">❏</button>
+                <button class="btn-icon danger" onclick="deleteTemplate('${t.id}', event)">🗑</button>
             </div>
         </div>
     `).join('');
     document.getElementById('mobile-template-list').innerHTML = tplHtml;
     document.getElementById('pc-template-list').innerHTML = tplHtml;
 
-    // 2. 渲染词库配置 (Config)
-    const vars = Object.keys(state.options);
-    // 分组
+    // Config 列表
     const groups = { other: [] };
     Object.keys(VAR_GROUPS).forEach(k => groups[k] = []);
-    vars.forEach(v => {
+    Object.keys(state.options).forEach(v => {
         let matched = false;
-        for (const [k, cfg] of Object.entries(VAR_GROUPS)) {
-            if (cfg.keys.includes(v)) { groups[k].push(v); matched = true; break; }
-        }
+        for (const [k, cfg] of Object.entries(VAR_GROUPS)) { if (cfg.keys.includes(v)) { groups[k].push(v); matched=true; break; } }
         if (!matched) groups.other.push(v);
     });
-
+    
     let configHtml = '';
     Object.entries(groups).forEach(([k, list]) => {
         if (list.length === 0) return;
-        const cfg = VAR_GROUPS[k] || VAR_GROUPS.other;
+        const cfg = VAR_GROUPS[k] || {label: '未分类', color: '#999'};
         configHtml += `<div class="config-group"><div class="config-group-header" style="color:${cfg.color}"><span>●</span> ${cfg.label}</div>`;
         list.forEach(v => {
+            const label = VAR_MAP[v] || v;
             const opts = state.options[v] || [];
             configHtml += `
                 <div class="var-config-card" id="conf-card-${v}">
-                    <div class="var-header" onclick="toggleConfigCard('${v}')">
-                        <div class="var-name">
-                            <span>${v}</span>
-                            <span class="var-key">{{${v}}}</span>
-                        </div>
-                        <span style="font-size:12px;color:#9ca3af">${opts.length} 个选项 ▼</span>
+                    <div class="var-header" onclick="document.getElementById('conf-card-${v}').classList.toggle('open')">
+                        <div class="var-name"><span>${label}</span><span class="var-key">{{${v}}}</span></div>
+                        <span style="font-size:12px;color:#9ca3af">${opts.length} 个 ▼</span>
                     </div>
                     <div class="var-body">
-                        ${opts.map((o, i) => `
-                            <div class="option-item">
-                                <span>${o}</span>
-                                <button onclick="removeOption('${v}', ${i})" style="color:#ef4444;">×</button>
-                            </div>
-                        `).join('')}
+                        ${opts.map((o, i) => `<div class="option-item"><span>${o}</span><button onclick="removeOption('${v}', ${i})" style="color:#ef4444;">×</button></div>`).join('')}
                         <div class="add-option-row">
                             <input class="add-input" id="input-new-${v}" placeholder="输入新选项...">
                             <button class="add-btn-small" onclick="addOption('${v}')">+</button>
                         </div>
                     </div>
-                </div>
-            `;
+                </div>`;
         });
         configHtml += `</div>`;
     });
     document.getElementById('config-list').innerHTML = configHtml;
 
-    // 3. 渲染 Editor
+    // Editor
     const tpl = getActiveTpl();
     if (tpl) {
         document.getElementById('editor-title').innerText = tpl.title;
         const tVars = getVars(tpl.content);
-        
-        let inputsHtml = '';
-        tVars.forEach(v => {
+        const inputsHtml = tVars.map(v => {
+            const label = VAR_MAP[v] || v;
             const val = state.values[v] || '';
-            const opts = state.options[v] || [];
-            inputsHtml += `
+            return `
                 <div class="field-card">
-                    <div class="field-label">${v}</div>
-                    <div class="field-input-wrapper">
+                    <div class="field-header">
+                        <div class="field-label"><span>${label}</span> <span class="field-var-key">{{${v}}}</span></div>
+                    </div>
+                    <div class="field-input-container">
                         <input class="field-input" value="${val}" oninput="updateVal('${v}', this.value)" placeholder="输入...">
-                        ${opts.length ? `<div class="field-dropdown-btn" onclick="showDropdown('${v}')">▼</div>` : ''}
+                        <div class="field-select-btn" onclick="openModal('${v}')">☰</div>
                     </div>
-                    <div id="drop-${v}" style="display:none;background:white;border:1px solid #eee;margin-top:4px;max-height:150px;overflow-y:auto;box-shadow:0 4px 6px rgba(0,0,0,0.1);border-radius:6px;">
-                        ${opts.map(o => `<div style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f9fafb;" onclick="updateVal('${v}','${o}'); hideDropdown('${v}')">${o}</div>`).join('')}
-                    </div>
-                </div>
-            `;
-        });
-        document.getElementById('editor-inputs').innerHTML = inputsHtml || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">无变量，请检查模版</div>';
+                </div>`;
+        }).join('') || '<div style="padding:20px;text-align:center;color:#999;">无变量</div>';
         
-        // 预览
-        const previewHtml = genText(true);
-        document.getElementById('pc-preview').innerHTML = previewHtml;
+        document.getElementById('editor-inputs').innerHTML = inputsHtml;
+        document.getElementById('pc-preview').innerHTML = genText(true);
+        document.getElementById('mobile-preview-hint').innerHTML = genText(false).substring(0, 30) + '...';
         
-        // 源码模式同步
         document.getElementById('tpl-title-input').value = tpl.title;
         document.getElementById('tpl-content-input').value = tpl.content;
     }
 
-    // 4. 视图切换状态
+    // Tabs
     document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${state.tab}`).classList.add('active');
-    
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.getElementById(`nav-${state.tab}`)?.classList.add('active');
-
     document.querySelectorAll('.pc-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(`pc-tab-${state.tab}`)?.classList.add('active');
     
-    // 源码/填空模式
     document.getElementById('editor-inputs').style.display = state.mode === 'fill' ? 'block' : 'none';
     document.getElementById('code-editor').style.display = state.mode === 'code' ? 'flex' : 'none';
 }
 
-// --- 交互动作 ---
+// --- 弹窗逻辑 ---
+window.openModal = (key) => {
+    state.currentModalVar = key;
+    const label = VAR_MAP[key] || key;
+    document.getElementById('modal-title').innerText = `选择 ${label}`;
+    const opts = state.options[key] || [];
+    document.getElementById('modal-list').innerHTML = opts.map(o => 
+        `<div class="select-item" onclick="selectFromModal('${o}')">${o}</div>`
+    ).join('') || '<div style="padding:20px;text-align:center;color:#999;">暂无选项</div>';
+    
+    document.getElementById('selection-modal').classList.add('open');
+}
+
+window.closeModal = (e) => {
+    if (e && e.target !== document.getElementById('selection-modal') && !e.target.closest('.modal-close-btn')) return;
+    document.getElementById('selection-modal').classList.remove('open');
+}
+
+window.selectFromModal = (val) => {
+    updateVal(state.currentModalVar, val);
+    document.getElementById('selection-modal').classList.remove('open');
+}
+
+window.addCustomOptionFromModal = () => {
+    const val = prompt("请输入新选项内容:");
+    if (val && val.trim()) {
+        const key = state.currentModalVar;
+        if (!state.options[key]) state.options[key] = [];
+        state.options[key].push(val.trim());
+        save();
+        selectFromModal(val.trim()); // Auto select
+    }
+}
+
+// --- 通用动作 ---
 window.switchTab = (tab) => { state.tab = tab; save(); }
 window.switchMode = () => { state.mode = state.mode === 'fill' ? 'code' : 'fill'; save(); }
-
-window.selectTemplate = (id) => {
-    state.activeId = id; 
-    state.tab = 'editor'; // 选中后自动跳 Editor
-    save();
-}
+window.selectTemplate = (id) => { state.activeId = id; state.tab = 'editor'; save(); }
+window.updateVal = (k, v) => { state.values[k] = v; save(); }
 
 window.createNewTemplate = () => {
-    const id = 't' + Date.now();
-    state.templates.push({ id, title: '新模版', content: '输入内容，使用 {{变量}} ...' });
-    state.activeId = id;
-    state.tab = 'editor';
-    save();
+    const id = 't'+Date.now();
+    state.templates.push({id, title:'新模版', content:'输入 {{变量}} ...'});
+    state.activeId = id; state.tab='editor'; save();
 }
-
-window.editTemplate = (id, e) => {
-    e.stopPropagation();
-    state.activeId = id;
-    state.tab = 'editor';
-    state.mode = 'code'; // 直接进源码模式改标题
-    save();
-}
-
-window.copyTemplate = (id, e) => {
-    e.stopPropagation();
-    const t = state.templates.find(x => x.id === id);
-    const newId = 't' + Date.now();
-    state.templates.push({ ...t, id: newId, title: t.title + ' (副本)' });
-    state.activeId = newId;
-    save();
-}
-
 window.deleteTemplate = (id, e) => {
     e.stopPropagation();
-    if (state.templates.length <= 1) return alert('至少保留一个');
-    if (confirm('确定删除?')) {
-        state.templates = state.templates.filter(x => x.id !== id);
-        state.activeId = state.templates[0].id;
-        save();
+    if(state.templates.length<=1) return alert('至少保留一个');
+    if(confirm('删除?')) {
+        state.templates = state.templates.filter(t=>t.id!==id);
+        state.activeId = state.templates[0].id; save();
     }
 }
-
-window.toggleConfigCard = (v) => {
-    const el = document.getElementById(`conf-card-${v}`);
-    el.classList.toggle('open');
+window.editTemplate = (id, e) => { e.stopPropagation(); state.activeId=id; state.tab='editor'; state.mode='code'; save(); }
+window.copyTemplate = (id, e) => {
+    e.stopPropagation();
+    const t = state.templates.find(x=>x.id===id);
+    state.templates.push({...t, id:'t'+Date.now(), title: t.title+'(副本)'});
+    save();
 }
 
+// Config actions
 window.addOption = (v) => {
-    const input = document.getElementById(`input-new-${v}`);
-    if (input.value.trim()) {
-        if (!state.options[v]) state.options[v] = [];
-        state.options[v].push(input.value.trim());
-        input.value = '';
-        save();
+    const inp = document.getElementById(`input-new-${v}`);
+    if(inp.value.trim()){ 
+        if(!state.options[v]) state.options[v]=[];
+        state.options[v].push(inp.value.trim()); 
+        inp.value=''; save(); 
     }
 }
+window.removeOption = (v, i) => { state.options[v].splice(i,1); save(); }
 
-window.removeOption = (v, idx) => {
-    state.options[v].splice(idx, 1);
-    save();
-}
+// Sync Inputs
+document.getElementById('tpl-title-input').addEventListener('input', e=>{ getActiveTpl().title=e.target.value; save(); });
+document.getElementById('tpl-content-input').addEventListener('input', e=>{ getActiveTpl().content=e.target.value; save(); });
 
-window.updateVal = (k, v) => { state.values[k] = v; save(); }
-window.showDropdown = (k) => { document.getElementById(`drop-${k}`).style.display = 'block'; }
-window.hideDropdown = (k) => { document.getElementById(`drop-${k}`).style.display = 'none'; }
+window.copyResult = () => navigator.clipboard.writeText(genText()).then(()=>alert('已复制'));
 
-// 源码编辑监听
-document.getElementById('tpl-title-input').addEventListener('input', (e) => {
-    state.templates.find(t => t.id === state.activeId).title = e.target.value;
-    save(); // 触发全量渲染更新列表标题
-});
-document.getElementById('tpl-content-input').addEventListener('input', (e) => {
-    state.templates.find(t => t.id === state.activeId).content = e.target.value;
-    save();
-});
-
-window.copyResult = () => { navigator.clipboard.writeText(genText()).then(()=>alert('已复制')); }
-window.exportImage = () => {
-    html2canvas(document.getElementById('pc-preview')).then(c => {
-        const a = document.createElement('a');
-        a.download = 'prompt.png';
-        a.href = c.toDataURL();
-        a.click();
-    });
-}
-
-// 启动
 render();
 </script>
 </body>

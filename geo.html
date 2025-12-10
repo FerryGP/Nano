@@ -3,120 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GEO 监控看板 (自动化集成版)</title>
+    <title>GEO 监控看板 (完整数据版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
 
-    <!-- 侧边栏保持不变，省略部分代码以节省篇幅，重点在 Script 部分 -->
+    <!-- 侧边栏 -->
     <aside class="w-64 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
         <div class="p-6 border-b border-gray-100">
             <h1 class="text-xl font-bold text-blue-700 flex items-center gap-2">
                 <i class="ph ph-robot text-2xl"></i>
                 GEO 自动看板
             </h1>
+            <p class="text-xs text-gray-400 mt-1 ml-1">v3.0 完整数据版</p>
         </div>
         <nav class="p-4 flex-1 space-y-2">
-            <button onclick="switchTab('dashboard')" class="nav-btn bg-blue-600 text-white w-full px-4 py-3 rounded-lg flex items-center gap-2">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn bg-blue-600 text-white w-full px-4 py-3 rounded-lg flex items-center gap-2 shadow-md transition-all">
                 <i class="ph ph-squares-four"></i> 数据总览
             </button>
-            <button onclick="switchTab('data')" class="nav-btn text-gray-600 hover:bg-gray-100 w-full px-4 py-3 rounded-lg flex items-center gap-2">
+            <button onclick="switchTab('data')" id="btn-data" class="nav-btn text-gray-600 hover:bg-gray-100 w-full px-4 py-3 rounded-lg flex items-center gap-2 transition-all">
                 <i class="ph ph-table"></i> 数据明细
             </button>
         </nav>
         
-        <!-- 新增：CSV 导入区 -->
+        <!-- CSV 导入区 -->
         <div class="p-4 border-t bg-blue-50">
-            <label class="block text-xs font-bold text-blue-800 mb-2">导入 Python 脚本数据</label>
+            <label class="block text-xs font-bold text-blue-800 mb-2">导入 Python 脚本数据 (CSV)</label>
             <input type="file" id="csv-upload" accept=".csv" class="block w-full text-xs text-gray-500
               file:mr-2 file:py-2 file:px-4
               file:rounded-full file:border-0
               file:text-xs file:font-semibold
               file:bg-blue-100 file:text-blue-700
               hover:file:bg-blue-200
+              cursor-pointer
             "/>
         </div>
     </aside>
 
     <main class="flex-1 overflow-y-auto p-8">
         <!-- Dashboard 内容区 -->
-        <div id="tab-dashboard" class="tab-content block">
+        <div id="tab-dashboard" class="tab-content block animate-fade-in">
             <header class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">实时诊断报告</h2>
-                <div class="text-sm text-gray-500">数据来源: <span id="data-source-tag">默认样本</span></div>
+                <div class="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border shadow-sm">
+                    数据来源: <span id="data-source-tag" class="font-medium text-blue-600">默认样本</span>
+                </div>
             </header>
 
+            <!-- 核心指标 -->
             <div class="grid grid-cols-3 gap-6 mb-6">
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="text-gray-500 text-sm">首位推荐率</h3>
-                    <div class="text-3xl font-bold text-green-600" id="stat-visibility">0%</div>
+                    <h3 class="text-gray-500 text-sm font-medium">首位推荐率</h3>
+                    <div class="text-3xl font-bold text-green-600 mt-2" id="stat-visibility">0%</div>
+                    <p class="text-xs text-gray-400 mt-1">排在第 1 位的占比</p>
                 </div>
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="text-gray-500 text-sm">正面情感占比</h3>
-                    <div class="text-3xl font-bold text-blue-600" id="stat-sentiment">0%</div>
+                    <h3 class="text-gray-500 text-sm font-medium">正面情感占比</h3>
+                    <div class="text-3xl font-bold text-blue-600 mt-2" id="stat-sentiment">0%</div>
+                    <p class="text-xs text-gray-400 mt-1">AI 回答偏正面的占比</p>
                 </div>
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="text-gray-500 text-sm">致命伤预警</h3>
-                    <div class="text-3xl font-bold text-red-500" id="stat-negative">0</div>
+                    <h3 class="text-gray-500 text-sm font-medium">致命伤预警</h3>
+                    <div class="text-3xl font-bold text-red-500 mt-2" id="stat-negative">0</div>
+                    <p class="text-xs text-gray-400 mt-1">存在负面描述的条数</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-6 h-80">
-                <div class="bg-white p-4 rounded-xl shadow-sm border relative">
-                    <canvas id="chart-visibility"></canvas>
+            <!-- 图表 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-80">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                    <h4 class="text-sm font-bold text-gray-700 mb-4">品牌可见性分布</h4>
+                    <div class="flex-1 relative">
+                        <canvas id="chart-visibility"></canvas>
+                    </div>
                 </div>
-                <div class="bg-white p-4 rounded-xl shadow-sm border relative">
-                    <canvas id="chart-ranking"></canvas>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                    <h4 class="text-sm font-bold text-gray-700 mb-4">各平台推荐表现</h4>
+                    <div class="flex-1 relative">
+                        <canvas id="chart-ranking"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- 数据表格区 -->
-        <div id="tab-data" class="tab-content hidden">
-            <h2 class="text-2xl font-bold mb-4">详细数据</h2>
-            <div class="bg-white rounded-xl shadow overflow-hidden">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 border-b">
+        <div id="tab-data" class="tab-content hidden animate-fade-in">
+            <header class="mb-6 flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-gray-800">详细数据记录</h2>
+                <span class="text-xs text-gray-400">提示：鼠标悬停在问题上可查看完整内容</span>
+            </header>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-xs">
                         <tr>
-                            <th class="p-3">平台</th>
-                            <th class="p-3">可见性</th>
-                            <th class="p-3">情感</th>
-                            <th class="p-3">关键词</th>
-                            <th class="p-3">致命伤</th>
+                            <th class="p-4 w-24">平台</th>
+                            <th class="p-4 w-20">编号</th>
+                            <th class="p-4 w-1/4">问题内容</th> <!-- 新增列 -->
+                            <th class="p-4 w-32">可见性</th>
+                            <th class="p-4 w-24">情感</th>
+                            <th class="p-4">关键词</th>
+                            <th class="p-4">致命伤</th>
                         </tr>
                     </thead>
-                    <tbody id="table-body"></tbody>
+                    <tbody id="table-body" class="divide-y divide-gray-100">
+                        <!-- 数据行将在这里生成 -->
+                    </tbody>
                 </table>
             </div>
         </div>
     </main>
 
     <script>
-        let reportData = [];
+        // 初始默认数据
+        let reportData = [
+            { platform: 'Kimi', promptId: 'A-1', question: '示例问题...', visibility: '第 1 位推荐', sentiment: '正面', keywords: '3D, 趣味', negative: '无' },
+            { platform: 'Doubao', promptId: 'A-1', question: '示例问题...', visibility: '无相关标注', sentiment: '中立', keywords: '游戏化', negative: '被误解' }
+        ];
+        
         let visChart = null;
         let rankChart = null;
 
-        // 切换 Tab 逻辑
+        // 切换 Tab
         function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + id).classList.remove('hidden');
+            
+            // 按钮样式切换
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+                btn.classList.add('text-gray-600', 'hover:bg-gray-100');
+            });
+            const activeBtn = document.getElementById('btn-' + id);
+            activeBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+            activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow-md');
         }
 
-        // CSV 导入逻辑 (PapaParse)
+        // CSV 导入逻辑
         document.getElementById('csv-upload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
             Papa.parse(file, {
                 header: true,
+                skipEmptyLines: true,
                 complete: function(results) {
                     console.log("解析完成:", results.data);
-                    // 简单的字段映射清洗
-                    reportData = results.data.filter(row => row.platform).map(row => ({
-                        platform: row.platform,
+                    // 映射字段，兼容中文列名和英文列名
+                    reportData = results.data.filter(row => row.platform || row['平台']).map(row => ({
+                        platform: row.platform || row['平台'],
+                        promptId: row.promptId || row['Prompt编号'] || '-',
+                        // --- 关键修改：读取 question 字段 ---
+                        question: row.question || row['问题'] || row['问题内容'] || '（未包含原始问题）',
                         visibility: row.visibility || row['可见性'] || '未知',
                         sentiment: row.sentiment || row['情感倾向'] || '中立',
                         keywords: row.keywords || row['核心关键词'] || '',
@@ -131,31 +178,49 @@
         });
 
         function updateUI() {
-            // 更新统计
+            // 1. 更新统计卡片
             const total = reportData.length;
             if (total === 0) return;
             
             const top1 = reportData.filter(d => d.visibility.includes('1')).length;
             const positive = reportData.filter(d => d.sentiment === '正面').length;
-            const negatives = reportData.filter(d => d.negative !== '无' && d.negative !== '').length;
+            const negatives = reportData.filter(d => d.negative !== '无' && d.negative !== '' && d.negative !== 'None').length;
 
             document.getElementById('stat-visibility').innerText = Math.round(top1/total*100) + "%";
             document.getElementById('stat-sentiment').innerText = Math.round(positive/total*100) + "%";
             document.getElementById('stat-negative').innerText = negatives;
 
-            // 更新表格
+            // 2. 更新表格
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = reportData.map(row => `
-                <tr class="border-b hover:bg-gray-50">
-                    <td class="p-3 font-medium">${row.platform}</td>
-                    <td class="p-3"><span class="px-2 py-1 bg-gray-100 rounded text-xs">${row.visibility}</span></td>
-                    <td class="p-3">${row.sentiment}</td>
-                    <td class="p-3 text-gray-500 truncate max-w-xs">${row.keywords}</td>
-                    <td class="p-3 text-red-500">${row.negative}</td>
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="p-4 font-medium text-gray-900">${row.platform}</td>
+                    <td class="p-4 text-xs text-gray-400 font-mono">${row.promptId}</td>
+                    
+                    <!-- 问题列：截断显示，悬停显示全部 -->
+                    <td class="p-4">
+                        <div class="truncate max-w-[240px] text-gray-600 text-sm cursor-help underline decoration-dotted" title="${row.question.replace(/"/g, '&quot;')}">
+                            ${row.question}
+                        </div>
+                    </td>
+                    
+                    <td class="p-4">
+                        <span class="px-2 py-1 rounded text-xs font-semibold ${
+                            row.visibility.includes('1') ? 'bg-green-100 text-green-700' : 
+                            row.visibility.includes('前') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+                        }">
+                            ${row.visibility}
+                        </span>
+                    </td>
+                    <td class="p-4 text-sm">${row.sentiment}</td>
+                    <td class="p-4 text-xs text-gray-500 truncate max-w-[150px]" title="${row.keywords}">${row.keywords}</td>
+                    <td class="p-4 text-sm ${
+                        (row.negative !== '无' && row.negative !== 'None') ? 'text-red-600 font-medium' : 'text-gray-400'
+                    }">${row.negative}</td>
                 </tr>
             `).join('');
 
-            // 更新图表
+            // 3. 更新图表
             updateCharts();
         }
 
@@ -170,30 +235,58 @@
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(visCounts),
-                    datasets: [{ data: Object.values(visCounts), backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444'] }]
+                    datasets: [{ 
+                        data: Object.values(visCounts), 
+                        backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#94a3b8'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
                 }
             });
 
-            // 柱状图数据 (简单计数)
+            // 柱状图数据
             const platCounts = {};
             reportData.forEach(d => {
-                if(d.visibility.includes('1') || d.visibility.includes('前3')) {
-                    platCounts[d.platform] = (platCounts[d.platform]||0) + 1;
-                }
+                // 简单的加权得分
+                let score = 0;
+                if(d.visibility.includes('1')) score = 3;
+                else if(d.visibility.includes('前')) score = 2;
+                else if(d.visibility.includes('包含')) score = 1;
+                
+                if (!platCounts[d.platform]) platCounts[d.platform] = {total:0, count:0};
+                platCounts[d.platform].total += score;
+                platCounts[d.platform].count += 1;
             });
+
+            const labels = Object.keys(platCounts);
+            const scores = labels.map(p => (platCounts[p].total / platCounts[p].count).toFixed(1));
 
             const ctxBar = document.getElementById('chart-ranking').getContext('2d');
             if(rankChart) rankChart.destroy();
             rankChart = new Chart(ctxBar, {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(platCounts),
-                    datasets: [{ label: '高质量推荐次数', data: Object.values(platCounts), backgroundColor: '#3b82f6' }]
+                    labels: labels,
+                    datasets: [{ 
+                        label: '平均推荐指数 (0-3)', 
+                        data: scores, 
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: 3 } }
                 }
             });
         }
         
-        // 初始化空状态
+        // 初始化运行一次
         updateUI();
     </script>
 </body>

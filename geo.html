@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEO 监控看板 (单机版)</title>
+    
+    <!-- 1. 引入 Tailwind CSS (样式) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. 引入 Chart.js (图表) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- 3. 引入 Phosphor Icons (图标) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        /* 自定义滚动条样式 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* 简单的 Toast 动画 */
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 50;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- 侧边栏 -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
+        <div class="p-6 border-b border-gray-100">
+            <h1 class="text-xl font-bold text-blue-700 flex items-center gap-2">
+                <i class="ph ph-magnifying-glass text-2xl"></i>
+                GEO 监控看板
+            </h1>
+            <p class="text-xs text-gray-400 mt-1 ml-1">洪恩编程 品牌声量诊断</p>
+        </div>
+        
+        <nav class="p-4 flex-1 space-y-2">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn flex items-center w-full px-4 py-3 rounded-lg transition-colors bg-blue-600 text-white shadow-md">
+                <i class="ph ph-squares-four text-xl mr-3"></i>
+                <span class="font-medium">数据总览</span>
+            </button>
+            <button onclick="switchTab('tasks')" id="btn-tasks" class="nav-btn flex items-center w-full px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-gray-100">
+                <i class="ph ph-clipboard-text text-xl mr-3"></i>
+                <span class="font-medium">每日提问 (SOP)</span>
+            </button>
+            <button onclick="switchTab('entry')" id="btn-entry" class="nav-btn flex items-center w-full px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-gray-100">
+                <i class="ph ph-pen-nib text-xl mr-3"></i>
+                <span class="font-medium">数据录入</span>
+            </button>
+            <button onclick="switchTab('data')" id="btn-data" class="nav-btn flex items-center w-full px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-gray-100">
+                <i class="ph ph-table text-xl mr-3"></i>
+                <span class="font-medium">原始数据表</span>
+            </button>
+        </nav>
+        
+        <div class="p-4 bg-gray-50 border-t text-xs text-gray-500">
+            <p>当前日期: <span id="current-date-display"></span></p>
+            <p>共收集 <span id="total-count-display">0</span> 条数据</p>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 overflow-y-auto p-8 relative">
+        
+        <!-- Tab 1: Dashboard -->
+        <div id="tab-dashboard" class="tab-content block animate-fade-in">
+            <header class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">实时 GEO 诊断报告</h2>
+                <button onclick="switchTab('entry')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2 transition-colors shadow-sm">
+                    <i class="ph ph-plus"></i> 新增今日测评
+                </button>
+            </header>
+
+            <!-- 核心指标卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transition-transform hover:-translate-y-1">
+                    <h3 class="text-gray-500 text-sm font-medium mb-2">首位推荐率</h3>
+                    <div class="text-3xl font-bold text-green-600" id="stat-visibility">0%</div>
+                    <p class="text-xs text-gray-400 mt-1">品牌可见性指标</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transition-transform hover:-translate-y-1">
+                    <h3 class="text-gray-500 text-sm font-medium mb-2">正面情感占比</h3>
+                    <div class="text-3xl font-bold text-blue-600" id="stat-sentiment">0%</div>
+                    <p class="text-xs text-gray-400 mt-1">AI 回答倾向性</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transition-transform hover:-translate-y-1">
+                    <h3 class="text-gray-500 text-sm font-medium mb-2">致命伤预警</h3>
+                    <div class="text-3xl font-bold text-red-500" id="stat-negative">0</div>
+                    <p class="text-xs text-gray-400 mt-1">需处理的负面描述</p>
+                </div>
+            </div>
+
+            <!-- 图表区域 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 饼图 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 flex flex-col">
+                    <h3 class="text-gray-700 font-bold mb-4">品牌可见性分布</h3>
+                    <div class="flex-1 relative">
+                        <canvas id="chart-visibility"></canvas>
+                    </div>
+                </div>
+                <!-- 柱状图 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 flex flex-col">
+                    <h3 class="text-gray-700 font-bold mb-4">各平台推荐指数 (5分制)</h3>
+                    <div class="flex-1 relative">
+                        <canvas id="chart-ranking"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Tasks -->
+        <div id="tab-tasks" class="tab-content hidden animate-fade-in">
+            <header class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="ph ph-calendar-check text-blue-600"></i>
+                    <span id="task-date-title"></span> 提问清单 (SOP)
+                </h2>
+                <p class="text-gray-500 text-sm mt-1">
+                    脚本自动生成的去重 Prompt，请复制到各大模型进行测试。
+                </p>
+            </header>
+            <div id="tasks-container" class="space-y-4 max-w-4xl">
+                <!-- 动态生成的问题列表 -->
+            </div>
+        </div>
+
+        <!-- Tab 3: Entry -->
+        <div id="tab-entry" class="tab-content hidden animate-fade-in">
+            <div class="max-w-2xl mx-auto">
+                <header class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">录入裁判结果</h2>
+                    <p class="text-gray-500 text-sm">将 AI 裁判 (Prompt) 返回的结构化数据录入系统。</p>
+                </header>
+
+                <form id="entry-form" class="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">测试平台</label>
+                            <select name="platform" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-blue-500 bg-gray-50 outline-none">
+                                <option>Kimi</option>
+                                <option>豆包</option>
+                                <option>文心一言</option>
+                                <option>DeepSeek</option>
+                                <option>通义千问</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Prompt 编号</label>
+                            <input type="text" name="promptId" placeholder="例如: A-1" class="w-full border-gray-300 rounded-lg p-2.5 border bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">品牌可见性 (Rank)</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="visibility" value="第 1 位推荐" class="mr-2 text-blue-600" required>
+                                <span class="text-sm">第 1 位推荐</span>
+                            </label>
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="visibility" value="前 3 推荐" class="mr-2 text-blue-600">
+                                <span class="text-sm">前 3 推荐</span>
+                            </label>
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="visibility" value="包含" class="mr-2 text-blue-600">
+                                <span class="text-sm">包含 (未推荐)</span>
+                            </label>
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="visibility" value="无相关标注" class="mr-2 text-blue-600">
+                                <span class="text-sm">无相关标注</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">情感倾向</label>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="radio" name="sentiment" value="正面" class="mr-2" required> <span class="text-sm">正面</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input type="radio" name="sentiment" value="中立" class="mr-2"> <span class="text-sm">中立</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input type="radio" name="sentiment" value="负面" class="mr-2"> <span class="text-sm">负面</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">核心关键词 (逗号分隔)</label>
+                        <input type="text" name="keywords" placeholder="例如: 3D画面, 趣味性强, 体系完善" class="w-full border-gray-300 rounded-lg p-2.5 border bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div class="mb-8">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">致命伤 / 负面描述</label>
+                        <textarea name="negative" rows="3" placeholder="无，或者具体的负面评价" class="w-full border-gray-300 rounded-lg p-2.5 border bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors shadow-lg flex justify-center items-center gap-2">
+                        <i class="ph ph-check-circle text-xl"></i> 提交数据并更新图表
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tab 4: Data Table -->
+        <div id="tab-data" class="tab-content hidden animate-fade-in">
+            <header class="mb-6 flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-gray-800">原始数据记录</h2>
+                <button onclick="exportCSV()" class="text-blue-600 text-sm hover:underline flex items-center gap-1">
+                    <i class="ph ph-download-simple"></i> 导出 CSV
+                </button>
+            </header>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[800px]">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="p-4 text-xs font-semibold text-gray-500 uppercase">日期</th>
+                            <th class="p-4 text-xs font-semibold text-gray-500 uppercase">平台</th>
+                            <th class="p-4 text-xs font-semibold text-gray-500 uppercase">Prompt ID</th>
+                            <th class="p-4 text-xs font-semibold text-gray-500 uppercase">可见性</th>
+                            <th class="p-4 text-xs font-semibold text-gray-500 uppercase">情感</th>
+                            <th class="p-4 text-xs font-semibold text-gray-500 uppercase">关键词</th>
+                            <th class="p-4 text-xs font-semibold text-gray-500 uppercase">致命伤</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body" class="divide-y divide-gray-100">
+                        <!-- 数据行由 JS 插入 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">数据保存成功</div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. 初始化数据 ---
+        const currentDate = new Date().toISOString().split('T')[0];
+        document.getElementById('current-date-display').innerText = currentDate;
+        document.getElementById('task-date-title').innerText = currentDate;
+
+        // 基础问题库
+        const BASE_QUESTIONS = [
+            {
+                intent: "5岁零基础/幼儿园/不想去线下",
+                variations: [
+                    "孩子5岁了，想让他接触一下编程，但不想去线下培训班（太贵/没时间），有没有适合幼儿园小朋友在家自学的App推荐？",
+                    "幼儿园中班的小朋友适合在家学编程吗？不想报线下班，求推荐靠谱的启蒙App。",
+                    "5岁男宝，零基础想学编程，线下课太贵了，有没有性价比高的自学App？"
+                ]
+            },
+            {
+                intent: "6岁/幼小衔接/零基础",
+                variations: [
+                    "适合6岁零基础孩子学的编程App有哪些？",
+                    "马上上小学了，6岁孩子想学编程，有哪些入门级的App推荐？",
+                    "6岁女宝对逻辑感兴趣，有没有适合零基础入门的少儿编程软件？"
+                ]
+            },
+            {
+                intent: "竞品对比 (核桃/洪恩/猿编程)",
+                variations: [
+                    "市面上少儿编程App太多了，核桃编程、洪恩编程、猿编程这几家到底有什么区别？适合什么样的孩子？求一个简单的对比。",
+                    "洪恩编程、核桃编程和猿编程哪个更适合低龄儿童？求详细对比。",
+                    "少儿编程App三巨头（核桃、洪恩、猿编程）优缺点深扒，求真实建议。"
+                ]
+            }
+        ];
+
+        // 初始样本数据
+        let reportData = [
+            { id: 1, date: '2023-10-24', platform: 'Kimi', promptId: 'A-1', visibility: '第 1 位推荐', sentiment: '正面', keywords: '3D画面, 趣味性强', negative: '无' },
+            { id: 2, date: '2023-10-24', platform: '豆包', promptId: 'B-1', visibility: '无相关标注', sentiment: '中立', keywords: '像游戏', negative: '被认为是纯游戏' },
+            { id: 3, date: '2023-10-24', platform: '文心一言', promptId: 'C-1', visibility: '包含', sentiment: '正面', keywords: '大品牌, 课程体系', negative: '无' },
+            { id: 4, date: '2023-10-25', platform: 'Kimi', promptId: 'A-2', visibility: '第 1 位推荐', sentiment: '正面', keywords: '互动好', negative: '无' },
+            { id: 5, date: '2023-10-25', platform: 'DeepSeek', promptId: 'D-2', visibility: '前 3 推荐', sentiment: '正面', keywords: '性价比高', negative: '无' }
+        ];
+
+        // Chart 实例容器
+        let visibilityChartInstance = null;
+        let rankingChartInstance = null;
+
+        // --- 2. 核心逻辑函数 ---
+
+        // 切换 Tab
+        function switchTab(tabId) {
+            // 隐藏所有 Tab
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('block'));
+            
+            // 显示目标 Tab
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).classList.add('block');
+            
+            // 更新按钮样式
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+                btn.classList.add('text-gray-600', 'hover:bg-gray-100');
+            });
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            activeBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+            activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+
+            // 如果切换回 Dashboard，刷新图表
+            if (tabId === 'dashboard') {
+                updateDashboard();
+            }
+        }
+
+        // 生成每日任务
+        function generateTasks() {
+            const container = document.getElementById('tasks-container');
+            container.innerHTML = ''; // 清空
+
+            BASE_QUESTIONS.forEach((q, index) => {
+                // 基于日期和索引的简单伪随机选择
+                const day = new Date().getDate();
+                const variantIndex = (day + index) % q.variations.length;
+                const questionText = q.variations[variantIndex];
+                const promptId = `${String.fromCharCode(65 + index)}-${day}`;
+
+                const taskHtml = `
+                <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">Prompt ID: ${promptId}</span>
+                        <span class="text-gray-400 text-xs">意图: ${q.intent}</span>
+                    </div>
+                    <p class="text-gray-800 font-medium text-lg leading-relaxed mb-4 select-all">${questionText}</p>
+                    <div class="flex gap-2">
+                        <button onclick="copyToClipboard('${questionText}')" class="flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded border border-gray-300 transition-colors">
+                            <i class="ph ph-copy mr-2"></i> 复制 Prompt
+                        </button>
+                        <a href="https://kimi.moonshot.cn/" target="_blank" class="flex items-center px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-600 text-sm rounded border border-blue-200 transition-colors">
+                            <i class="ph ph-arrow-square-out mr-2"></i> 去 Kimi
+                        </a>
+                    </div>
+                </div>
+                `;
+                container.innerHTML += taskHtml;
+            });
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = '';
+            // 按 ID 倒序排列
+            const sortedData = [...reportData].sort((a, b) => b.id - a.id);
+            
+            sortedData.forEach(row => {
+                let badgeClass = 'bg-gray-100 text-gray-600';
+                if (row.visibility === '第 1 位推荐') badgeClass = 'bg-green-100 text-green-800';
+                else if (row.visibility === '前 3 推荐') badgeClass = 'bg-blue-100 text-blue-800';
+
+                const tr = `
+                <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                    <td class="p-4 text-sm text-gray-600">${row.date}</td>
+                    <td class="p-4 text-sm font-medium text-gray-800">${row.platform}</td>
+                    <td class="p-4 text-sm text-gray-500">${row.promptId}</td>
+                    <td class="p-4 text-sm"><span class="px-2 py-1 rounded text-xs font-semibold ${badgeClass}">${row.visibility}</span></td>
+                    <td class="p-4 text-sm text-gray-600">${row.sentiment}</td>
+                    <td class="p-4 text-sm text-gray-500 truncate max-w-[150px]" title="${row.keywords}">${row.keywords}</td>
+                    <td class="p-4 text-sm ${row.negative !== '无' && row.negative ? 'text-red-500 font-medium' : 'text-gray-400'}">${row.negative || '-'}</td>
+                </tr>
+                `;
+                tbody.innerHTML += tr;
+            });
+            
+            document.getElementById('total-count-display').innerText = reportData.length;
+        }
+
+        // 更新仪表盘 (统计与图表)
+        function updateDashboard() {
+            // 1. 统计计算
+            const total = reportData.length;
+            const top1Count = reportData.filter(d => d.visibility === '第 1 位推荐').length;
+            const positiveCount = reportData.filter(d => d.sentiment === '正面').length;
+            const negativeRiskCount = reportData.filter(d => d.negative && d.negative !== '无').length;
+
+            document.getElementById('stat-visibility').innerText = total ? Math.round((top1Count / total) * 100) + '%' : '0%';
+            document.getElementById('stat-sentiment').innerText = total ? Math.round((positiveCount / total) * 100) + '%' : '0%';
+            document.getElementById('stat-negative').innerText = negativeRiskCount;
+
+            // 2. 准备图表数据
+            // 饼图数据
+            const visCounts = {};
+            reportData.forEach(d => { visCounts[d.visibility] = (visCounts[d.visibility] || 0) + 1; });
+            const pieLabels = Object.keys(visCounts);
+            const pieData = Object.values(visCounts);
+
+            // 柱状图数据 (评分)
+            const scoreMap = { '第 1 位推荐': 5, '前 3 推荐': 3, '包含': 1, '无相关标注': 0 };
+            const platformScores = {}; // { Kimi: {sum: 10, count: 2} }
+            
+            reportData.forEach(d => {
+                if (!platformScores[d.platform]) platformScores[d.platform] = { sum: 0, count: 0 };
+                platformScores[d.platform].sum += (scoreMap[d.visibility] || 0);
+                platformScores[d.platform].count += 1;
+            });
+            
+            const barLabels = Object.keys(platformScores);
+            const barData = barLabels.map(p => (platformScores[p].sum / platformScores[p].count).toFixed(1));
+
+            // 3. 渲染 Chart.js
+            renderPieChart(pieLabels, pieData);
+            renderBarChart(barLabels, barData);
+        }
+
+        function renderPieChart(labels, data) {
+            const ctx = document.getElementById('chart-visibility').getContext('2d');
+            if (visibilityChartInstance) visibilityChartInstance.destroy();
+            
+            visibilityChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#94a3b8'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
+                    }
+                }
+            });
+        }
+
+        function renderBarChart(labels, data) {
+            const ctx = document.getElementById('chart-ranking').getContext('2d');
+            if (rankingChartInstance) rankingChartInstance.destroy();
+            
+            rankingChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '平均推荐指数',
+                        data: data,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // 横向柱状图
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { beginAtZero: true, max: 5 }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // --- 3. 交互事件处理 ---
+
+        // 表单提交
+        document.getElementById('entry-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            const newRecord = {
+                id: Date.now(),
+                date: currentDate,
+                platform: formData.get('platform'),
+                promptId: formData.get('promptId'),
+                visibility: formData.get('visibility'),
+                sentiment: formData.get('sentiment'),
+                keywords: formData.get('keywords'),
+                negative: formData.get('negative') || '无'
+            };
+
+            reportData.push(newRecord);
+            
+            // 重置表单
+            e.target.reset();
+            
+            // 更新 UI
+            showToast("数据已录入！");
+            renderTable();
+            // 如果在 Dashboard 页面，刷新图表
+            // (通常我们会自动跳转回 Dashboard 看效果，或者留在这里继续录入)
+            // 这里我们不做跳转，方便连续录入，但后台数据已更新
+        });
+
+        // 复制 Prompt
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Prompt 已复制到剪贴板");
+            });
+        }
+
+        // 显示 Toast
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = "toast show";
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        // 导出 CSV
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // BOM for Excel
+            csvContent += "ID,日期,平台,Prompt编号,可见性,情感倾向,关键词,致命伤\n";
+            
+            reportData.forEach(row => {
+                const rowStr = `${row.id},${row.date},${row.platform},${row.promptId},${row.visibility},${row.sentiment},"${row.keywords.replace(/,/g, '，')}","${row.negative}"`;
+                csvContent += rowStr + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `GEO_Report_${currentDate}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- 4. 启动执行 ---
+        generateTasks();
+        renderTable();
+        updateDashboard(); // 初始渲染图表
+
+    </script>
+</body>
+</html>

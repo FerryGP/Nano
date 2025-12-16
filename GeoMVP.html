@@ -3,391 +3,342 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Owl | 洪恩识字 GEO 诊断系统 MVP</title>
+    <title>Project Owl | Enterprise GEO Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f3f4f6; }
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-        .score-good { color: #10b981; }
-        .score-mid { color: #f59e0b; }
-        .score-bad { color: #ef4444; }
-        .radar-container { position: relative; height: 300px; width: 100%; }
-        /* 模拟加载动画 */
-        .loading-bar { transition: width 0.5s ease; }
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; }
+        /* Profound 风格的侧边栏 */
+        .sidebar-link { transition: all 0.2s; border-left: 3px solid transparent; }
+        .sidebar-link.active { background-color: #f1f5f9; border-left-color: #4f46e5; color: #1e293b; font-weight: 600; }
+        .sidebar-link:hover:not(.active) { background-color: #f8fafc; }
+        
+        /* 卡片风格 */
+        .pro-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .metric-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600; }
+        .metric-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+        
+        /* 状态指示灯 */
+        .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-green { background-color: #22c55e; box-shadow: 0 0 0 2px #dcfce7; }
+        .dot-red { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
     </style>
 </head>
-<body class="text-gray-800">
+<body class="flex h-screen overflow-hidden text-slate-800">
 
-    <nav class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 flex items-center gap-2">
-                        <i class="fa-solid fa-owl text-indigo-600 text-2xl"></i>
-                        <span class="font-bold text-xl tracking-tight text-gray-900">Project Owl <span class="text-xs text-gray-500 font-normal border border-gray-300 rounded px-1">MVP</span></span>
-                    </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                        <a href="#" class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">仪表盘</a>
-                        <a href="#" class="border-transparent text-gray-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">测试集配置</a>
-                        <a href="#" class="border-transparent text-gray-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">优化建议</a>
-                    </div>
-                </div>
-                <div class="flex items-center">
-                    <button onclick="startDiagnosis()" id="btn-diagnose" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow transition flex items-center gap-2">
-                        <i class="fa-solid fa-rotate"></i> 立即诊断
-                    </button>
-                </div>
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col z-10">
+        <div class="h-16 flex items-center px-6 border-b border-gray-100">
+            <div class="flex items-center gap-2 text-indigo-600">
+                <i class="fa-solid fa-layer-group text-xl"></i>
+                <span class="font-bold text-lg tracking-tight text-slate-900">Project Owl</span>
             </div>
         </div>
-    </nav>
-
-    <div id="progress-container" class="hidden fixed top-0 left-0 w-full h-1 bg-gray-200 z-50">
-        <div id="progress-bar" class="h-full bg-indigo-600 w-0 loading-bar"></div>
-    </div>
-
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="card p-6 flex flex-col justify-between relative overflow-hidden">
-                <div class="absolute top-0 right-0 p-4 opacity-10">
-                    <i class="fa-solid fa-chart-line text-6xl text-indigo-600"></i>
+        <div class="flex-1 py-6 space-y-1 overflow-y-auto">
+            <div class="px-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Features</div>
+            
+            <a href="#" onclick="switchTab('insights')" id="nav-insights" class="sidebar-link active flex items-center px-6 py-3 text-sm text-slate-600">
+                <i class="fa-solid fa-chart-line w-6"></i> 
+                <span>Answer Insights</span>
+                <span class="ml-auto text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">口碑</span>
+            </a>
+            
+            <a href="#" onclick="switchTab('prompts')" id="nav-prompts" class="sidebar-link flex items-center px-6 py-3 text-sm text-slate-600">
+                <i class="fa-solid fa-magnifying-glass w-6"></i>
+                <span>Prompt Volumes</span>
+                <span class="ml-auto text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">需求</span>
+            </a>
+
+            <a href="#" onclick="switchTab('agent')" id="nav-agent" class="sidebar-link flex items-center px-6 py-3 text-sm text-slate-600">
+                <i class="fa-solid fa-robot w-6"></i>
+                <span>Agent Analytics</span>
+                <span class="ml-auto text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">技术</span>
+            </a>
+
+            <a href="#" onclick="switchTab('shopping')" id="nav-shopping" class="sidebar-link flex items-center px-6 py-3 text-sm text-slate-600">
+                <i class="fa-solid fa-tag w-6"></i>
+                <span>Conversion / Shop</span>
+                <span class="ml-auto text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">转化</span>
+            </a>
+        </div>
+
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center gap-3">
+                <div class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">PM</div>
+                <div class="text-xs">
+                    <p class="font-medium text-slate-900">Product Manager</p>
+                    <p class="text-slate-500">ihuman.com</p>
                 </div>
-                <div>
-                    <h3 class="text-sm font-medium text-gray-500">GEO 总分 (全网加权)</h3>
-                    <div class="mt-2 flex items-baseline">
-                        <span id="total-score" class="text-5xl font-extrabold text-gray-900">--</span>
-                        <span class="ml-2 text-sm font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
-                            <i class="fa-solid fa-arrow-up"></i> 2.4%
-                        </span>
-                    </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto bg-[#f8fafc] p-8">
+        
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900" id="page-title">Answer Engine Insights</h1>
+                <p class="text-sm text-slate-500 mt-1">监测 AI 如何在对话中提及“洪恩识字”及竞品。</p>
+            </div>
+            <div class="flex gap-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span class="status-dot dot-green"></span> All Systems Normal
+                </span>
+                <button class="bg-white border border-gray-300 text-slate-700 px-3 py-1.5 rounded text-sm hover:bg-gray-50">Last 7 Days</button>
+                <button class="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm hover:bg-indigo-700 font-medium">Export Report</button>
+            </div>
+        </header>
+
+        <div id="view-insights" class="space-y-6">
+            <div class="grid grid-cols-4 gap-4">
+                <div class="pro-card p-5">
+                    <div class="metric-label">Share of Voice (SoV)</div>
+                    <div class="metric-value mt-1">42.5%</div>
+                    <div class="text-xs text-green-600 mt-1 flex items-center gap-1"><i class="fa-solid fa-arrow-up"></i> 5.2% vs 竞品</div>
                 </div>
-                <div class="mt-4">
-                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                        <div id="score-bar" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div>
-                    </div>
-                    <p class="mt-2 text-xs text-gray-500">基于 6 大平台、120 个 Prompt、600 次采样计算</p>
+                <div class="pro-card p-5">
+                    <div class="metric-label">Positive Sentiment</div>
+                    <div class="metric-value mt-1">88%</div>
+                    <div class="text-xs text-slate-400 mt-1">AI 评价偏正面</div>
+                </div>
+                <div class="pro-card p-5">
+                    <div class="metric-label">Brand Mentions</div>
+                    <div class="metric-value mt-1">1,240</div>
+                    <div class="text-xs text-green-600 mt-1"><i class="fa-solid fa-arrow-up"></i> 120 本周新增</div>
+                </div>
+                <div class="pro-card p-5">
+                    <div class="metric-label">Citation Score</div>
+                    <div class="metric-value mt-1">92</div>
+                    <div class="text-xs text-slate-400 mt-1">引用源权威度</div>
                 </div>
             </div>
 
-            <div class="card p-4 col-span-1 md:col-span-1">
-                <h3 class="text-sm font-medium text-gray-500 mb-2">平台健康度分布 (均衡性)</h3>
-                <div class="radar-container flex justify-center items-center">
-                    <canvas id="radarChart"></canvas>
+            <div class="grid grid-cols-3 gap-6">
+                <div class="pro-card p-6 col-span-1">
+                    <h3 class="text-sm font-bold text-slate-800 mb-4">Market Share (AI SoV)</h3>
+                    <div class="h-64 flex justify-center">
+                        <canvas id="sovChart"></canvas>
+                    </div>
+                    <div class="mt-4 text-xs text-center text-slate-500">
+                        在 "识字APP" 相关话题下，AI 提及各品牌的比例
+                    </div>
+                </div>
+
+                <div class="pro-card p-6 col-span-2">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-slate-800">Visibility Trend (Last 30 Days)</h3>
+                        <div class="flex gap-2">
+                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-600"></span> 洪恩</span>
+                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-400"></span> 悟空</span>
+                        </div>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="trendChart"></canvas>
+                    </div>
                 </div>
             </div>
 
-            <div class="card p-6 flex flex-col justify-center">
-                <h3 class="text-sm font-medium text-gray-500">均衡度指数 (Balance Index)</h3>
-                <div class="mt-2 flex items-center gap-4">
-                    <div class="text-4xl font-bold text-gray-900" id="balance-score">--</div>
-                    <div class="text-sm text-gray-500">
-                        <p>标准差: <span class="font-mono">12.5</span></p>
-                        <p class="text-yellow-600"><i class="fa-solid fa-triangle-exclamation"></i> DeepSeek 拖了后腿</p>
-                    </div>
+            <div class="pro-card">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between">
+                    <h3 class="font-bold text-slate-800">Recent AI Mentions Feed</h3>
                 </div>
-                <div class="mt-6 border-t pt-4">
-                    <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">当前短板</h4>
-                    <div class="flex items-center gap-2 mt-2">
-                         <span class="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded">DeepSeek</span>
-                         <span class="text-xs text-gray-600">竞品拦截率低 (20%)</span>
+                <div class="divide-y divide-gray-100">
+                    <div class="p-4 flex gap-4 hover:bg-slate-50 transition">
+                        <div class="w-10 h-10 rounded bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">Doubao (豆包)</span>
+                                <span class="text-xs text-slate-400">2 mins ago</span>
+                            </div>
+                            <p class="text-sm text-slate-800 font-medium">"在众多识字软件中，<span class="bg-indigo-100 text-indigo-800 px-1">洪恩识字</span>依然是互动性最好的选择..."</p>
+                            <div class="mt-2 text-xs text-slate-500 flex gap-4">
+                                <span><i class="fa-solid fa-quote-left"></i> Source: zhihu.com</span>
+                                <span><i class="fa-solid fa-face-smile text-green-500"></i> Positive</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 flex gap-4 hover:bg-slate-50 transition">
+                        <div class="w-10 h-10 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-brain"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">DeepSeek</span>
+                                <span class="text-xs text-slate-400">1 hour ago</span>
+                            </div>
+                            <p class="text-sm text-slate-800 font-medium">"悟空识字更适合大龄儿童，而<span class="bg-indigo-100 text-indigo-800 px-1">洪恩</span>适合启蒙阶段..."</p>
+                            <div class="mt-2 text-xs text-slate-500 flex gap-4">
+                                <span><i class="fa-solid fa-quote-left"></i> Source: xiaohongshu.com</span>
+                                <span><i class="fa-solid fa-face-meh text-yellow-500"></i> Neutral</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="border-b border-gray-200 mb-6">
-            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                <a href="#" class="border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">全部概览</a>
-                <a href="#" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">品类词 (获客)</a>
-                <a href="#" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">品牌词 (口碑)</a>
-                <a href="#" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">竞品词 (防御)</a>
-            </nav>
+        <div id="view-prompts" class="hidden space-y-6">
+            <div class="pro-card p-6">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">High Opportunity Prompts</h3>
+                <p class="text-sm text-slate-500 mb-6">以下是家长常问 AI，但洪恩目前未获得首位推荐的“高潜力”问题。</p>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-xs text-slate-400 border-b border-gray-100">
+                            <th class="py-3 font-semibold uppercase">Prompt (家长提问)</th>
+                            <th class="py-3 font-semibold uppercase">Volume (热度)</th>
+                            <th class="py-3 font-semibold uppercase">Current Rank</th>
+                            <th class="py-3 font-semibold uppercase">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm text-slate-700">
+                        <tr class="border-b border-gray-50 hover:bg-slate-50">
+                            <td class="py-4 font-medium">"适合3岁男孩的识字APP"</td>
+                            <td class="py-4"><div class="w-24 bg-gray-200 h-1.5 rounded-full overflow-hidden"><div class="bg-indigo-500 h-1.5 w-[80%]"></div></div></td>
+                            <td class="py-4"><span class="text-red-500 font-bold">#4</span> (悟空 #1)</td>
+                            <td class="py-4"><button class="text-indigo-600 hover:underline">Generate Answer</button></td>
+                        </tr>
+                        <tr class="border-b border-gray-50 hover:bg-slate-50">
+                            <td class="py-4 font-medium">"洪恩识字永久包多少钱"</td>
+                            <td class="py-4"><div class="w-24 bg-gray-200 h-1.5 rounded-full overflow-hidden"><div class="bg-indigo-500 h-1.5 w-[60%]"></div></div></td>
+                            <td class="py-4"><span class="text-yellow-500 font-bold">#2</span> (信息过时)</td>
+                            <td class="py-4"><button class="text-indigo-600 hover:underline">Update Price</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="platform-cards">
+        <div id="view-agent" class="hidden space-y-6">
+            <div class="grid grid-cols-2 gap-6">
+                <div class="pro-card p-6">
+                    <h3 class="font-bold text-slate-800 mb-4">Crawler Accessibility</h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center p-3 bg-green-50 rounded border border-green-100">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-robot text-green-600"></i>
+                                <span class="font-medium text-sm">GPTBot (OpenAI)</span>
+                            </div>
+                            <span class="text-xs font-bold text-green-700 bg-white px-2 py-1 rounded border border-green-200">ALLOWED</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-red-50 rounded border border-red-100">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-spider text-red-600"></i>
+                                <span class="font-medium text-sm">Bytespider (Doubao)</span>
+                            </div>
+                            <span class="text-xs font-bold text-red-700 bg-white px-2 py-1 rounded border border-red-200">BLOCKED</span>
+                        </div>
+                    </div>
+                    <p class="mt-4 text-xs text-slate-500"><i class="fa-solid fa-triangle-exclamation"></i> 警告：Bytespider 被 robots.txt 拦截，导致豆包无法抓取最新官网内容。</p>
+                </div>
             </div>
-
-        <div class="card overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-medium text-gray-900">高优需修复问题 (Top Issues)</h3>
-                <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">按严重程度排序</span>
-            </div>
-            <ul class="divide-y divide-gray-200" id="issue-list">
-                </ul>
         </div>
+
+        <div id="view-shopping" class="hidden space-y-6">
+             <div class="pro-card p-6">
+                <h3 class="font-bold text-slate-800 mb-2">Product Card Visibility</h3>
+                <p class="text-sm text-slate-500 mb-6">模拟 AI 搜索结果中的富媒体卡片展示效果。</p>
+                
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="border border-green-200 rounded-lg p-4 bg-green-50 relative">
+                        <div class="absolute top-2 right-2 text-green-600"><i class="fa-solid fa-circle-check"></i></div>
+                        <div class="h-24 bg-gray-200 rounded mb-3 flex items-center justify-center text-gray-400">Product Image</div>
+                        <div class="font-bold text-slate-800">洪恩识字 - 永久包</div>
+                        <div class="text-sm text-slate-600 mb-2">¥ 248.00</div>
+                        <button class="w-full bg-blue-500 text-white text-xs py-2 rounded">Buy Now (Link Active)</button>
+                        <p class="mt-2 text-xs text-green-700 text-center">ChatGPT Display: Perfect</p>
+                    </div>
+
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50 relative">
+                        <div class="absolute top-2 right-2 text-red-600"><i class="fa-solid fa-circle-xmark"></i></div>
+                        <div class="h-24 bg-gray-200 rounded mb-3 flex items-center justify-center text-gray-400">Image Broken</div>
+                        <div class="font-bold text-slate-800">洪恩识字 - 月卡</div>
+                        <div class="text-sm text-slate-600 mb-2">Price Missing</div>
+                        <button class="w-full bg-gray-300 text-gray-500 text-xs py-2 rounded cursor-not-allowed">Link 404</button>
+                        <p class="mt-2 text-xs text-red-700 text-center">Kimi Display: Error</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
-    <div id="snapshot-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 overflow-hidden max-h-[90vh] flex flex-col">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <div>
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">GEO 多模态快照</h3>
-                    <p class="mt-1 text-sm text-gray-500">Prompt: <span class="font-mono text-indigo-600 bg-indigo-50 px-1">"悟空识字和洪恩识字哪个好？"</span></p>
-                </div>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-500"><i class="fa-solid fa-times text-xl"></i></button>
-            </div>
-            <div class="p-6 overflow-y-auto bg-gray-100 flex-1">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-white p-3 rounded shadow border-l-4 border-green-500">
-                        <div class="flex justify-between mb-2"><span class="font-bold text-sm">豆包</span> <span class="text-xs bg-green-100 text-green-800 px-1 rounded">首推洪恩</span></div>
-                        <div class="text-xs text-gray-600 leading-relaxed">
-                            ...综合来看，<span class="bg-green-100 font-bold text-green-800">洪恩识字</span>的课程体系更科学，覆盖了写字功能。悟空识字更偏向游戏化...
-                        </div>
-                    </div>
-                    <div class="bg-white p-3 rounded shadow border-l-4 border-green-500">
-                        <div class="flex justify-between mb-2"><span class="font-bold text-sm">Kimi</span> <span class="text-xs bg-green-100 text-green-800 px-1 rounded">详细对比</span></div>
-                        <div class="text-xs text-gray-600 leading-relaxed">
-                            以下是两者的对比表：1. <span class="bg-green-100 font-bold text-green-800">洪恩识字</span>：包含1300字，互动性强。2. 悟空识字...
-                        </div>
-                    </div>
-                    <div class="bg-white p-3 rounded shadow border-l-4 border-red-500">
-                        <div class="flex justify-between mb-2"><span class="font-bold text-sm">DeepSeek</span> <span class="text-xs bg-red-100 text-red-800 px-1 rounded">幻觉/旧数据</span></div>
-                        <div class="text-xs text-gray-600 leading-relaxed">
-                            悟空识字是目前市场上最主流的选择。至于<span class="bg-red-100 font-bold text-red-800">洪恩识字，目前好像已经停止更新了(幻觉)</span>...
-                        </div>
-                    </div>
-                    <div class="bg-white p-3 rounded shadow border-l-4 border-yellow-500">
-                        <div class="flex justify-between mb-2"><span class="font-bold text-sm">文心一言</span> <span class="text-xs bg-yellow-100 text-yellow-800 px-1 rounded">未明确站队</span></div>
-                        <div class="text-xs text-gray-600 leading-relaxed">
-                            这两款软件各有千秋。您可以根据孩子的兴趣选择。
-                        </div>
-                    </div>
-                    <div class="bg-white p-3 rounded shadow border-l-4 border-green-500">
-                        <div class="flex justify-between mb-2"><span class="font-bold text-sm">通义千问</span> <span class="text-xs bg-green-100 text-green-800 px-1 rounded">推荐洪恩</span></div>
-                        <div class="text-xs text-gray-600 leading-relaxed">
-                             如果您注重写字规范，我推荐<span class="bg-green-100 font-bold text-green-800">洪恩识字</span>。
-                        </div>
-                    </div>
-                    <div class="bg-white p-3 rounded shadow border-l-4 border-green-500">
-                        <div class="flex justify-between mb-2"><span class="font-bold text-sm">腾讯元宝</span> <span class="text-xs bg-green-100 text-green-800 px-1 rounded">引用公众号</span></div>
-                        <div class="text-xs text-gray-600 leading-relaxed">
-                            根据多个育儿公众号的评测，<span class="bg-green-100 font-bold text-green-800">洪恩识字</span>的好评率更高...
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
-                 <button class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-50">复制所有文本</button>
-                 <button class="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700">生成针对 DeepSeek 的修正语料</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // === 1. 配置与模拟数据 ===
-        const platforms = [
-            { id: 'doubao', name: '豆包', icon: 'bg-blue-500' },
-            { id: 'deepseek', name: 'DeepSeek', icon: 'bg-indigo-500' },
-            { id: 'ernie', name: '文心一言', icon: 'bg-blue-600' },
-            { id: 'qwen', name: '通义千问', icon: 'bg-purple-600' },
-            { id: 'yuanbao', name: '腾讯元宝', icon: 'bg-blue-400' },
-            { id: 'kimi', name: 'Kimi', icon: 'bg-pink-500' }
-        ];
+        // === 1. Tab Switching Logic ===
+        function switchTab(tabId) {
+            // Update Navigation
+            document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + tabId).classList.add('active');
+            
+            // Update Views
+            ['insights', 'prompts', 'agent', 'shopping'].forEach(id => {
+                document.getElementById('view-' + id).classList.add('hidden');
+            });
+            document.getElementById('view-' + tabId).classList.remove('hidden');
 
-        // 模拟初始分数 (DeepSeek 故意设置较低，模拟真实情况)
-        let mockScores = {
-            'doubao': 88,
-            'deepseek': 45,
-            'ernie': 82,
-            'qwen': 85,
-            'yuanbao': 78,
-            'kimi': 92
-        };
+            // Update Title
+            const titles = {
+                'insights': 'Answer Engine Insights',
+                'prompts': 'Prompt Volumes & Opportunity',
+                'agent': 'Agent Analytics (Technical)',
+                'shopping': 'Conversion & Product Cards'
+            };
+            document.getElementById('page-title').innerText = titles[tabId];
+        }
 
-        let radarChartInstance = null;
-
-        // === 2. 初始化图表 ===
-        function initChart() {
-            const ctx = document.getElementById('radarChart').getContext('2d');
-            radarChartInstance = new Chart(ctx, {
-                type: 'radar',
+        // === 2. Charts Initialization ===
+        window.onload = function() {
+            // Trend Chart (Competitor Comparison)
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            new Chart(ctxTrend, {
+                type: 'line',
                 data: {
-                    labels: platforms.map(p => p.name),
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
                     datasets: [{
-                        label: 'GEO 健康度',
-                        data: Object.values(mockScores),
-                        fill: true,
-                        backgroundColor: 'rgba(79, 70, 229, 0.2)',
-                        borderColor: 'rgb(79, 70, 229)',
-                        pointBackgroundColor: 'rgb(79, 70, 229)',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#fff',
-                        pointHoverBorderColor: 'rgb(79, 70, 229)'
+                        label: '洪恩识字',
+                        data: [65, 70, 68, 72, 75, 80, 82],
+                        borderColor: '#4f46e5', // Indigo
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: '悟空识字',
+                        data: [60, 58, 62, 60, 59, 61, 60],
+                        borderColor: '#fb923c', // Orange
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        fill: false
                     }]
                 },
                 options: {
-                    scales: {
-                        r: {
-                            angleLines: { color: '#e5e7eb' },
-                            grid: { color: '#e5e7eb' },
-                            suggestedMin: 0,
-                            suggestedMax: 100,
-                            ticks: { display: false } // 隐藏具体刻度数字，更美观
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    maintainAspectRatio: false
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Share of Voice Chart (Donut)
+            const ctxSov = document.getElementById('sovChart').getContext('2d');
+            new Chart(ctxSov, {
+                type: 'doughnut',
+                data: {
+                    labels: ['洪恩识字', '悟空识字', '叫叫阅读', '其他'],
+                    datasets: [{
+                        data: [42, 28, 20, 10],
+                        backgroundColor: ['#4f46e5', '#fb923c', '#22c55e', '#cbd5e1'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '70%',
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } }
                 }
             });
         }
-
-        // === 3. 渲染页面组件 ===
-        function renderDashboard() {
-            // 计算总分
-            const values = Object.values(mockScores);
-            const total = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-            
-            // 渲染总分
-            const totalEl = document.getElementById('total-score');
-            const scoreBar = document.getElementById('score-bar');
-            
-            // 数字跳动动画
-            let current = 0;
-            const timer = setInterval(() => {
-                if(current >= total) {
-                    clearInterval(timer);
-                    totalEl.innerText = total;
-                } else {
-                    current += 2;
-                    totalEl.innerText = current;
-                }
-            }, 20);
-            
-            scoreBar.style.width = `${total}%`;
-            
-            // 渲染平台卡片
-            const cardsContainer = document.getElementById('platform-cards');
-            cardsContainer.innerHTML = '';
-            platforms.forEach(p => {
-                const score = mockScores[p.id];
-                let colorClass = score >= 80 ? 'text-green-600' : (score >= 60 ? 'text-yellow-600' : 'text-red-600');
-                let trendIcon = score >= 80 ? 'fa-arrow-up' : (score >= 60 ? 'fa-minus' : 'fa-arrow-down');
-                
-                cardsContainer.innerHTML += `
-                    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-md transition">
-                        <div class="text-sm font-medium text-gray-500 mb-1">${p.name}</div>
-                        <div class="text-3xl font-bold ${colorClass}">${score}</div>
-                        <div class="text-xs text-gray-400 mt-1"><i class="fa-solid ${trendIcon}"></i> 本周</div>
-                    </div>
-                `;
-            });
-
-            // 渲染问题列表 (Mock Data)
-            const issueList = document.getElementById('issue-list');
-            issueList.innerHTML = `
-                <li class="px-6 py-4 hover:bg-gray-50 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="flex-shrink-0 bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded">High</span>
-                        <div class="text-sm text-gray-900">
-                            <span class="font-bold text-gray-700">[DeepSeek]</span> 搜索 "适合大班的识字APP" -> 
-                            <span class="text-red-600">未提及洪恩 (拦截率 0%)</span>
-                        </div>
-                    </div>
-                    <button onclick="openModal()" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">查看快照</button>
-                </li>
-                <li class="px-6 py-4 hover:bg-gray-50 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="flex-shrink-0 bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded">Medium</span>
-                        <div class="text-sm text-gray-900">
-                            <span class="font-bold text-gray-700">[腾讯元宝]</span> 搜索 "洪恩识字价格" -> 
-                            <span class="text-yellow-600">引用了2023年的旧价格体系</span>
-                        </div>
-                    </div>
-                    <button class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">查看快照</button>
-                </li>
-                 <li class="px-6 py-4 hover:bg-gray-50 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="flex-shrink-0 bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">Win</span>
-                        <div class="text-sm text-gray-900">
-                            <span class="font-bold text-gray-700">[Kimi]</span> 搜索 "悟空识字对比" -> 
-                            <span class="text-green-600">成功将洪恩列为第一替代选项</span>
-                        </div>
-                    </div>
-                    <button class="text-gray-400 hover:text-gray-600 text-sm font-medium">详情</button>
-                </li>
-            `;
-
-            // 计算均衡度
-            document.getElementById('balance-score').innerText = '0.78';
-        }
-
-        // === 4. 模拟诊断过程 ===
-        function startDiagnosis() {
-            const btn = document.getElementById('btn-diagnose');
-            const progressContainer = document.getElementById('progress-container');
-            const progressBar = document.getElementById('progress-bar');
-            
-            // UI 状态更新
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 采样中(0/600)...';
-            btn.disabled = true;
-            btn.classList.add('opacity-75');
-            progressContainer.classList.remove('hidden');
-            
-            // 模拟进度条
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 5;
-                if (progress > 100) progress = 100;
-                progressBar.style.width = `${progress}%`;
-                
-                // 模拟采样文字变化
-                const sampleCount = Math.floor(progress * 6);
-                btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> 采样中(${sampleCount}/600)...`;
-
-                if (progress === 100) {
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        // 完成
-                        finishDiagnosis();
-                    }, 500);
-                }
-            }, 100);
-        }
-
-        function finishDiagnosis() {
-            const btn = document.getElementById('btn-diagnose');
-            const progressContainer = document.getElementById('progress-container');
-            
-            // 随机微调分数，模拟每次结果不同
-            mockScores['deepseek'] = Math.floor(Math.random() * (55 - 40) + 40); // 还是比较低
-            mockScores['doubao'] = Math.floor(Math.random() * (95 - 85) + 85); // 依然很高
-            
-            // 更新 UI
-            progressContainer.classList.add('hidden');
-            btn.innerHTML = '<i class="fa-solid fa-check"></i> 诊断完成';
-            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-            btn.classList.add('bg-green-600', 'hover:bg-green-700');
-            setTimeout(() => {
-                btn.innerHTML = '<i class="fa-solid fa-rotate"></i> 重新诊断';
-                btn.classList.remove('bg-green-600', 'hover:bg-green-700', 'opacity-75');
-                btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-                btn.disabled = false;
-            }, 2000);
-
-            // 更新图表数据
-            radarChartInstance.data.datasets[0].data = Object.values(mockScores);
-            radarChartInstance.update();
-            renderDashboard();
-        }
-
-        // === 5. Modal 控制 ===
-        function openModal() {
-            document.getElementById('snapshot-modal').classList.remove('hidden');
-        }
-        function closeModal() {
-            document.getElementById('snapshot-modal').classList.add('hidden');
-        }
-
-        // === 启动 ===
-        window.onload = function() {
-            initChart();
-            renderDashboard();
-        }
-
     </script>
 </body>
 </html>
